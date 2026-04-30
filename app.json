@@ -1,28 +1,30 @@
 {
   "expo": {
-    "name": "fut-app",
-    "slug": "fut-app",
+    "name": "FutMatch",
+    "slug": "futmatch",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "futapp",
+    "scheme": "futmatch",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#16A34A"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.futmatch.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#16A34A"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.futmatch.app"
     },
     "web": {
       "bundler": "metro",
@@ -30,7 +32,27 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Permita que o FutMatch acesse sua localização para encontrar quadras próximas."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permita que o FutMatch acesse suas fotos para enviar imagens de quadras."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#16A34A"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
