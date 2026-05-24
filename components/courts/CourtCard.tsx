@@ -1,6 +1,7 @@
 import { MapPin, Star } from 'lucide-react-native';
 import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
+import { resolvePhotoUrl } from '../../services/courts.service';
 import { colors, radius, spacing } from '../../theme';
 import type { Court } from '../../types';
 import { formatCurrency, formatDistance } from '../../utils/format';
@@ -13,7 +14,7 @@ interface CourtCardProps {
 }
 
 export function CourtCard({ court, onPress }: CourtCardProps) {
-  const photo = court.photos?.[0]?.url;
+  const photo = court.photos?.[0]?.url ? resolvePhotoUrl(court.photos[0].url) : undefined;
   const minPrice = court.schedules?.reduce(
     (min: number, s) => Math.min(min, s.basePrice),
     Infinity

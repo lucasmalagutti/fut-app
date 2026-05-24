@@ -28,17 +28,18 @@ export function Chip({ label, selected = false, onPress, style }: ChipProps) {
 const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 1,
+    paddingVertical: 8,
     borderRadius: radius.full,
     borderWidth: 1.5,
     borderColor: colors.border,
     backgroundColor: colors.white,
+    alignSelf: 'flex-start',
   },
   selected: {
     backgroundColor: colors.primary[600],
     borderColor: colors.primary[600],
   },
   pressed: { opacity: 0.8 },
-  label: { fontSize: 13, fontWeight: '500', color: colors.text.secondary },
+  label: { fontSize: 13, fontWeight: '500', color: colors.text.secondary, flexShrink: 0 },
   labelSelected: { color: colors.white },
 });

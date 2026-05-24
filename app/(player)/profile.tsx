@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
-import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { z } from 'zod';
 import { Avatar } from '../../components/ui/Avatar';
 import { Button } from '../../components/ui/Button';
@@ -36,6 +36,31 @@ export default function PlayerProfileScreen() {
     },
     onError: () => Alert.alert('Erro', 'Não foi possível atualizar o perfil.'),
   });
+
+  const avatarMutation = useMutation({
+    mutationFn: ({ uri, mimeType }: { uri: string; mimeType?: string }) =>
+      authService.uploadAvatar(uri, mimeType),
+    onSuccess: (updated) => { setUser(updated); },
+    onError: () => Alert.alert('Erro', 'Não foi possível atualizar a foto.'),
+  });
+
+  const handlePickAvatar = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permissão necessária', 'Permita o acesso à galeria para trocar a foto.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'images',
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      avatarMutation.mutate({ uri: asset.uri, mimeType: asset.mimeType ?? undefined });
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert('Sair', 'Deseja sair da conta?', [
@@ -73,7 +98,13 @@ export default function PlayerProfileScreen() {
         <Text style={styles.title}>Meu Perfil</Text>
 
         <View style={styles.avatarSection}>
-          <Avatar name={user?.name} uri={user?.avatarUrl} size={80} />
+          <TouchableOpacity onPress={handlePickAvatar} style={styles.avatarWrapper} activeOpacity={0.8}>
+            <Avatar name={user?.name} uri={user?.avatarUrl} size={80} />
+            <View style={styles.cameraBadge}>
+              <Text style={styles.cameraIcon}>📷</Text>
+            </View>
+          </TouchableOpacity>
+          {avatarMutation.isPending && <Text style={styles.uploadingText}>Atualizando foto...</Text>}
           <Text style={styles.userName}>{user?.name}</Text>
           <Text style={styles.userEmail}>{user?.email}</Text>
         </View>
@@ -127,6 +158,20 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.lg, gap: spacing.lg },
   title: { fontSize: 26, fontWeight: '800', color: colors.text.primary },
   avatarSection: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.lg },
+  avatarWrapper: { position: 'relative' },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.primary[600],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraIcon: { fontSize: 13 },
+  uploadingText: { fontSize: 12, color: colors.text.secondary },
   userName: { fontSize: 20, fontWeight: '700', color: colors.text.primary },
   userEmail: { fontSize: 14, color: colors.text.secondary },
   form: { gap: spacing.md },

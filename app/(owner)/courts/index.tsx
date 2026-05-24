@@ -1,14 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Plus } from 'lucide-react-native';
-import { FlatList, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../../../components/ui/Avatar';
 import { Badge } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
-import { courtsService } from '../../../services/courts.service';
+import { courtsService, resolvePhotoUrl } from '../../../services/courts.service';
 import { useAuthStore } from '../../../store/auth.store';
 import { colors, spacing } from '../../../theme';
 
@@ -16,11 +16,12 @@ export default function OwnerCourtsScreen() {
   const user = useAuthStore((s) => s.user);
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['owner-courts'],
-    queryFn: () => courtsService.list({ limit: 50 }),
+    queryKey: ['owner-courts', user?.id],
+    queryFn: () => courtsService.listByOwner(user!.id),
+    enabled: !!user?.id,
   });
 
-  const courts = (data?.data ?? []).filter((c) => c.ownerId === user?.id);
+  const courts = data ?? [];
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -55,9 +56,20 @@ export default function OwnerCourtsScreen() {
               style={styles.courtCard}
             >
               <View style={styles.courtRow}>
-                <View style={styles.courtEmoji}>
-                  <Text style={{ fontSize: 28 }}>⚽</Text>
-                </View>
+                {(() => {
+                  // Backend retorna fotos ordenadas por createdAt asc — primeira é a mais antiga presente
+                  const firstPhoto = item.photos?.[0];
+                  return firstPhoto ? (
+                    <Image
+                      source={{ uri: resolvePhotoUrl(firstPhoto.url) }}
+                      style={styles.courtThumb}
+                    />
+                  ) : (
+                    <View style={styles.courtEmoji}>
+                      <Text style={{ fontSize: 28 }}>⚽</Text>
+                    </View>
+                  );
+                })()}
                 <View style={{ flex: 1 }}>
                   <View style={styles.courtHeader}>
                     <Text style={styles.courtName}>{item.name}</Text>
@@ -96,6 +108,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary[50],
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  courtThumb: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
   },
   courtHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
   courtName: { fontSize: 16, fontWeight: '700', color: colors.text.primary, flex: 1 },

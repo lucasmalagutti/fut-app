@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   Alert,
@@ -10,6 +11,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { z } from 'zod';
@@ -17,18 +19,18 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { authService } from '../../services/auth.service';
 import { useAuthStore } from '../../store/auth.store';
-import { colors, spacing } from '../../theme';
+import { colors, radius, spacing } from '../../theme';
 
 const schema = z.object({
   email: z.string().email('E-mail inválido'),
   password: z.string().min(1, 'Informe a senha'),
-  keepConnected: z.boolean().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
 
 export default function LoginScreen() {
   const signIn = useAuthStore((s) => s.signIn);
+  const [remember, setRemember] = useState(false);
 
   const {
     control,
@@ -42,7 +44,7 @@ export default function LoginScreen() {
   const onSubmit = async (data: FormData) => {
     try {
       const res = await authService.login({ email: data.email, password: data.password });
-      await signIn(res);
+      await signIn(res, remember);
       if (res.user.role === 'owner') {
         router.replace('/(owner)');
       } else {
@@ -104,12 +106,23 @@ export default function LoginScreen() {
               )}
             />
 
-            <Pressable
-              onPress={() => router.push('/(auth)/forgot-password')}
-              style={styles.forgotBtn}
-            >
-              <Text style={styles.forgotText}>Esqueci minha senha</Text>
-            </Pressable>
+            {/* Lembrar-me + Esqueci senha */}
+            <View style={styles.row}>
+              <TouchableOpacity
+                style={styles.checkboxRow}
+                onPress={() => setRemember((v) => !v)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.checkbox, remember && styles.checkboxChecked]}>
+                  {remember && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+                <Text style={styles.checkboxLabel}>Lembrar de mim</Text>
+              </TouchableOpacity>
+
+              <Pressable onPress={() => router.push('/(auth)/forgot-password')}>
+                <Text style={styles.forgotText}>Esqueci minha senha</Text>
+              </Pressable>
+            </View>
 
             <Button
               label="Entrar"
@@ -140,7 +153,24 @@ const styles = StyleSheet.create({
   title: { fontSize: 32, fontWeight: '800', color: colors.text.primary, marginBottom: 6 },
   subtitle: { fontSize: 16, color: colors.text.secondary, marginBottom: spacing.xl },
   form: { gap: spacing.md },
-  forgotBtn: { alignSelf: 'flex-end' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: colors.primary[600],
+    borderColor: colors.primary[600],
+  },
+  checkmark: { fontSize: 12, color: colors.white, fontWeight: '700', lineHeight: 14 },
+  checkboxLabel: { fontSize: 14, color: colors.text.primary },
   forgotText: { fontSize: 14, color: colors.primary[600], fontWeight: '500' },
   signupText: { fontSize: 15, textAlign: 'center', color: colors.text.secondary, marginTop: spacing.xl },
   signupLink: { color: colors.primary[600], fontWeight: '700' },

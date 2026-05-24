@@ -37,6 +37,7 @@ export interface Court {
   longitude: number;
   amenities: string[];
   rules?: string;
+  mapsUrl?: string;
   status: CourtStatus;
   ratingAvg: number;
   ratingCount: number;

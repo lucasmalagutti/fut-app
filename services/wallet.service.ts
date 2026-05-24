@@ -17,6 +17,9 @@ export const walletService = {
   addBankAccount: (data: Omit<BankAccount, 'id' | 'userId'>) =>
     api.post<BankAccount>('/wallet/bank-accounts', data).then((r) => r.data),
 
+  deleteBankAccount: (id: string) =>
+    api.delete(`/wallet/bank-accounts/${id}`).then((r) => r.data),
+
   requestPayout: (data: PayoutData) =>
     api.post<Payout>('/wallet/payouts', data).then((r) => r.data),
 

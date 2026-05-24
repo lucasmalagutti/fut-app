@@ -42,4 +42,43 @@ export const authService = {
 
   deleteAccount: (password: string) =>
     api.delete('/me', { data: { password } }).then((r) => r.data),
+
+  uploadAvatar: async (imageUri: string, mimeType?: string): Promise<User> => {
+    // fetch nativo — axios não gerencia boundary do multipart corretamente no React Native
+    const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
+    const { useAuthStore } = await import('../store/auth.store');
+    const token = useAuthStore.getState().accessToken;
+
+    // Derivar filename e tipo a partir da URI
+    const uriParts = imageUri.split('/');
+    const rawName = uriParts[uriParts.length - 1] ?? 'avatar.jpg';
+    // URIs do expo podem ter query params: ex "ImagePicker/xxx.jpg?..."
+    const filename = rawName.split('?')[0] || 'avatar.jpg';
+    const ext = filename.split('.').pop()?.toLowerCase() ?? 'jpg';
+    const mimeMap: Record<string, string> = {
+      jpg: 'image/jpeg', jpeg: 'image/jpeg',
+      png: 'image/png', webp: 'image/webp',
+      heic: 'image/heic', heif: 'image/heif',
+    };
+    // Prefer mimeType passado pelo caller (do asset.mimeType do expo-image-picker)
+    const type = mimeType ?? mimeMap[ext] ?? 'image/jpeg';
+
+    const formData = new FormData();
+    // React Native trata o append de objetos com uri/name/type como blob de arquivo
+    formData.append('file', { uri: imageUri, name: filename, type } as any);
+
+    const res = await fetch(`${API_URL}/me/avatar`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      // NÃO setar Content-Type manualmente — fetch define o boundary automaticamente
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as any)?.message ?? 'Erro ao fazer upload');
+    }
+
+    return res.json() as Promise<User>;
+  },
 };

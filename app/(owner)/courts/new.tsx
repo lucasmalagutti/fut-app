@@ -18,10 +18,12 @@ import { z } from 'zod';
 import { Button } from '../../../components/ui/Button';
 import { Chip } from '../../../components/ui/Chip';
 import { Input } from '../../../components/ui/Input';
+import { SelectPicker } from '../../../components/ui/SelectPicker';
 import { courtsService } from '../../../services/courts.service';
+import { CITIES_BY_STATE, STATES } from '../../../constants/brazil-locations';
 import { colors, spacing } from '../../../theme';
 
-const SPORTS = ['Futebol', 'Society', 'Futsal', 'Basquete', 'Tênis', 'Vôlei'];
+const SPORTS = ['Futebol', 'Society', 'Futsal', 'Futevôlei'];
 const AMENITIES_OPTIONS = ['Vestiário', 'Estacionamento', 'Iluminação', 'Gramado sintético', 'Bar/Lanchonete', 'Wifi'];
 
 const schema = z.object({
@@ -29,25 +31,31 @@ const schema = z.object({
   sport: z.string().min(1, 'Selecione o esporte'),
   description: z.string().optional(),
   addressLine: z.string().min(5, 'Endereço obrigatório'),
-  city: z.string().min(2, 'Cidade obrigatória'),
-  state: z.string().length(2, 'UF com 2 caracteres'),
+  city: z.string().min(2, 'Selecione a cidade'),
+  state: z.string().length(2, 'Selecione o estado'),
   zip: z.string().min(8, 'CEP inválido'),
   latitude: z.string().optional(),
   longitude: z.string().optional(),
   rules: z.string().optional(),
+  mapsUrl: z.string().url('Link inválido').optional().or(z.literal('')),
 });
 
 type FormData = z.infer<typeof schema>;
+
+const STATE_OPTIONS = STATES.map((s) => ({ label: `${s.uf} – ${s.name}`, value: s.uf }));
 
 export default function NewCourtScreen() {
   const queryClient = useQueryClient();
   const [selectedSport, setSelectedSport] = useState('');
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
 
-  const { control, handleSubmit, formState: { errors, isSubmitting }, setValue } = useForm<FormData>({
+  const { control, handleSubmit, watch, setValue, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { state: 'SP' },
+    defaultValues: { name: '', sport: '', description: '', addressLine: '', city: '', state: 'SP', zip: '', rules: '', mapsUrl: '' },
   });
+
+  const selectedState = watch('state');
+  const cityOptions = (CITIES_BY_STATE[selectedState] ?? []).map((c) => ({ label: c, value: c }));
 
   const createMutation = useMutation({
     mutationFn: (data: FormData) =>
@@ -58,12 +66,18 @@ export default function NewCourtScreen() {
         amenities: selectedAmenities as unknown as string[],
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['owner-courts'] });
+      queryClient.invalidateQueries({ queryKey: ['owner-courts'], exact: false });
+      reset({ state: 'SP', city: '', name: '', sport: '', description: '', addressLine: '', zip: '', rules: '', mapsUrl: '' });
+      setSelectedSport('');
+      setSelectedAmenities([]);
       Alert.alert('Quadra cadastrada!', 'Sua quadra foi criada com sucesso.', [
         { text: 'OK', onPress: () => router.back() },
       ]);
     },
-    onError: () => Alert.alert('Erro', 'Não foi possível cadastrar a quadra.'),
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message ?? 'Não foi possível cadastrar a quadra.';
+      Alert.alert('Erro', msg);
+    },
   });
 
   const toggleAmenity = (amenity: string) => {
@@ -122,26 +136,41 @@ export default function NewCourtScreen() {
               )}
             />
 
-            <View style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Controller
-                  control={control}
-                  name="city"
-                  render={({ field: { onChange, onBlur, value } }) => (
-                    <Input label="Cidade" placeholder="São Paulo" value={value} onChangeText={onChange} onBlur={onBlur} error={errors.city?.message} />
-                  )}
+            <Controller
+              control={control}
+              name="state"
+              render={({ field: { value } }) => (
+                <SelectPicker
+                  label="Estado"
+                  placeholder="Selecione o estado..."
+                  value={value}
+                  options={STATE_OPTIONS}
+                  onChange={(uf) => {
+                    setValue('state', uf, { shouldValidate: true });
+                    setValue('city', '', { shouldValidate: false });
+                  }}
+                  error={errors.state?.message}
+                  searchable
                 />
-              </View>
-              <View style={{ width: 80 }}>
-                <Controller
-                  control={control}
-                  name="state"
-                  render={({ field: { onChange, onBlur, value } }) => (
-                    <Input label="UF" placeholder="SP" value={value} onChangeText={onChange} onBlur={onBlur} error={errors.state?.message} maxLength={2} autoCapitalize="characters" />
-                  )}
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="city"
+              render={({ field: { value } }) => (
+                <SelectPicker
+                  label="Cidade"
+                  placeholder={selectedState ? 'Selecione a cidade...' : 'Selecione o estado primeiro'}
+                  value={value}
+                  options={cityOptions}
+                  onChange={(city) => setValue('city', city, { shouldValidate: true })}
+                  error={errors.city?.message}
+                  disabled={!selectedState}
+                  searchable
                 />
-              </View>
-            </View>
+              )}
+            />
 
             <Controller
               control={control}
@@ -173,6 +202,23 @@ export default function NewCourtScreen() {
               )}
             />
 
+            <Controller
+              control={control}
+              name="mapsUrl"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <Input
+                  label="Link Google Maps (opcional)"
+                  placeholder="https://maps.app.goo.gl/..."
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  error={errors.mapsUrl?.message}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                />
+              )}
+            />
+
             <Button
               label="Cadastrar quadra"
               onPress={handleSubmit((d) => createMutation.mutate(d))}
@@ -196,6 +242,5 @@ const styles = StyleSheet.create({
   form: { gap: spacing.md },
   label: { fontSize: 14, fontWeight: '500', color: colors.text.primary, marginBottom: 6 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  row: { flexDirection: 'row', gap: spacing.md },
   errorText: { fontSize: 12, color: colors.error, marginTop: 4 },
 });
