@@ -8,6 +8,7 @@ import { Badge, bookingStatusBadge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 
 const statusLabel: Record<string, string> = {
+  open: 'Partida aberta',
   pending: 'Pendente',
   confirmed: 'Confirmada',
   completed: 'Concluída',

@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { Bell, CalendarDays, Home, User, Wallet } from 'lucide-react-native';
 import { colors } from '../../theme';
 
+
 export default function PlayerLayout() {
   return (
     <Tabs
@@ -60,6 +61,7 @@ export default function PlayerLayout() {
       <Tabs.Screen name="chat/index" options={{ href: null }} />
       <Tabs.Screen name="chat/[threadId]" options={{ href: null }} />
       <Tabs.Screen name="matches/index" options={{ href: null }} />
+      <Tabs.Screen name="matches/[id]" options={{ href: null }} />
     </Tabs>
   );
 }

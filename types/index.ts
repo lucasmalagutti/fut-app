@@ -1,9 +1,9 @@
 export type Role = 'player' | 'owner' | 'master';
 export type UserStatus = 'active' | 'inactive' | 'banned' | 'deleted';
 export type CourtStatus = 'active' | 'inactive';
-export type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
+export type BookingStatus = 'open' | 'pending' | 'confirmed' | 'completed' | 'cancelled';
 export type InviteStatus = 'pending' | 'accepted' | 'declined' | 'cancelled';
-export type PartStatus = 'joined' | 'checked_in' | 'cancelled';
+export type PartStatus = 'joined' | 'paid' | 'unpaid' | 'checked_in' | 'cancelled';
 export type PayMethod = 'card' | 'pix';
 export type PayStatus = 'pending' | 'paid' | 'refunded' | 'failed';
 export type TxType = 'booking_charge' | 'payout' | 'refund' | 'fee' | 'adjustment';
@@ -101,14 +101,18 @@ export interface Match {
   bookingId: string;
   hostId: string;
   sport: string;
-  slots: number;
-  pricePerPlayer: number;
+  minPlayers: number;
+  maxPlayers: number;
   isPublic: boolean;
+  closedAt?: string;
+  confirmedAt?: string;
   createdAt: string;
   booking?: Booking;
   host?: User;
   participants?: MatchParticipant[];
   invites?: MatchInvite[];
+  estimatedQuota?: number;
+  totalSlots?: number;
 }
 
 export interface MatchInvite {
@@ -126,7 +130,11 @@ export interface MatchParticipant {
   id: string;
   matchId: string;
   userId: string;
-  status: PartStatus;
+  guestName?: string;
+  slots: number;
+  quota?: number;
+  paymentStatus: PartStatus;
+  paymentId?: string;
   user?: User;
 }
 

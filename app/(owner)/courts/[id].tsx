@@ -86,7 +86,7 @@ interface BlockForm {
 
 interface EditForm {
   name: string;
-  sport: string;
+  sports: string[];
   description: string;
   addressLine: string;
   city: string;
@@ -123,7 +123,7 @@ export default function OwnerCourtDetailScreen() {
   const [scheduleForm, setScheduleForm] = useState({ ...DEFAULT_SCHEDULE });
   const [blockForm, setBlockForm] = useState<BlockForm>({ ...DEFAULT_BLOCK });
   const [editForm, setEditForm] = useState<EditForm>({
-    name: '', sport: '', description: '', addressLine: '',
+    name: '', sports: [], description: '', addressLine: '',
     city: '', state: 'SP', zip: '', rules: '', mapsUrl: '', amenities: [],
   });
 
@@ -148,9 +148,18 @@ export default function OwnerCourtDetailScreen() {
     const amenities = Array.isArray(court.amenities)
       ? court.amenities
       : (() => { try { return JSON.parse(court.amenities as unknown as string); } catch { return []; } })();
+    // Deserializa sports: pode ser JSON array ou string simples (retrocompat)
+    let sports: string[] = [];
+    try {
+      const parsed = JSON.parse((court as any).sport ?? '');
+      sports = Array.isArray(parsed) ? parsed : [(court as any).sport];
+    } catch {
+      sports = court.sport ? [court.sport] : [];
+    }
+
     setEditForm({
       name: court.name ?? '',
-      sport: court.sport ?? '',
+      sports,
       description: court.description ?? '',
       addressLine: court.addressLine ?? '',
       city: court.city ?? '',
@@ -279,8 +288,8 @@ export default function OwnerCourtDetailScreen() {
       Alert.alert('Atenção', 'Nome da quadra deve ter ao menos 2 caracteres.');
       return;
     }
-    if (!editForm.sport) {
-      Alert.alert('Atenção', 'Selecione o esporte.');
+    if (editForm.sports.length === 0) {
+      Alert.alert('Atenção', 'Selecione ao menos um esporte.');
       return;
     }
     if (!editForm.addressLine.trim()) {
@@ -297,6 +306,8 @@ export default function OwnerCourtDetailScreen() {
     }
     updateCourtMutation.mutate({
       ...editForm,
+      sports: editForm.sports,
+      sport: editForm.sports[0] ?? '',
       mapsUrl: editForm.mapsUrl || undefined,
       rules: editForm.rules || undefined,
       description: editForm.description || undefined,
@@ -393,8 +404,15 @@ export default function OwnerCourtDetailScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.infoLabel}>Esporte</Text>
-            <Chip label={court.sport} style={{ alignSelf: 'flex-start' }} />
+            <Text style={styles.infoLabel}>Esportes</Text>
+            <View style={styles.chipsRow}>
+              {(() => {
+                let sports: string[] = [];
+                try { const p = JSON.parse((court as any).sport ?? ''); sports = Array.isArray(p) ? p : [court.sport]; }
+                catch { sports = court.sport ? [court.sport] : []; }
+                return sports.map((s, i) => <Chip key={i} label={s} />);
+              })()}
+            </View>
 
             <Text style={styles.infoLabel}>Endereço</Text>
             <Text style={styles.infoValue}>{court.addressLine}, {court.city} – {court.state}</Text>
@@ -597,16 +615,21 @@ export default function OwnerCourtDetailScreen() {
               />
             </View>
 
-            {/* Esporte */}
+            {/* Esportes — multi-select */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Esporte</Text>
+              <Text style={styles.fieldLabel}>Esportes <Text style={{ fontSize: 12, color: colors.text.secondary, fontWeight: '400' }}>(selecione um ou mais)</Text></Text>
               <View style={styles.chipsRow}>
                 {SPORTS.map((sport) => (
                   <Chip
                     key={sport}
                     label={sport}
-                    selected={editForm.sport === sport}
-                    onPress={() => setEditForm((f) => ({ ...f, sport }))}
+                    selected={editForm.sports.includes(sport)}
+                    onPress={() => setEditForm((f) => ({
+                      ...f,
+                      sports: f.sports.includes(sport)
+                        ? f.sports.filter((s) => s !== sport)
+                        : [...f.sports, sport],
+                    }))}
                   />
                 ))}
               </View>

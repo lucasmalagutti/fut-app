@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Clock, ExternalLink, MapPin, Star } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { ChevronLeft, Clock, ExternalLink, MapPin, Star, Users } from 'lucide-react-native';
+import { useState } from 'react';
 import {
   Dimensions,
   FlatList,
@@ -23,8 +23,9 @@ import { Card } from '../../../components/ui/Card';
 import { Chip } from '../../../components/ui/Chip';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { courtsService, resolvePhotoUrl } from '../../../services/courts.service';
+import { matchesService } from '../../../services/matches.service';
 import { colors, spacing } from '../../../theme';
-import { formatCurrency, getDayName } from '../../../utils/format';
+import { formatCurrency, formatTime, getDayName } from '../../../utils/format';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -129,6 +130,12 @@ export default function CourtDetailScreen() {
   const { data: reviews = [] } = useQuery({
     queryKey: ['reviews', id],
     queryFn: () => courtsService.getReviews(id),
+  });
+
+  const { data: openMatches = [] } = useQuery({
+    queryKey: ['matches', 'open', id, selectedDate],
+    queryFn: () => matchesService.findOpen({ courtId: id, date: selectedDate }),
+    enabled: !!id && !!selectedDate,
   });
 
   if (isLoading) return <LoadingSpinner fullScreen />;
@@ -465,6 +472,46 @@ export default function CourtDetailScreen() {
             )}
           </View>
 
+          {/* ── Partidas abertas neste dia ── */}
+          {openMatches.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Partidas abertas nesta data</Text>
+              <Text style={styles.openMatchesHint}>
+                Jogadores já organizaram partidas neste dia. Participe em vez de criar uma nova!
+              </Text>
+              {openMatches.map((match) => {
+                const bk = match.booking;
+                const totalSlots = match.totalSlots ?? 0;
+                const estimatedQuota = match.estimatedQuota ?? 0;
+                return (
+                  <Pressable
+                    key={match.id}
+                    onPress={() => router.push({ pathname: '/(player)/matches/[id]', params: { id: match.id } })}
+                  >
+                    <Card style={styles.openMatchCard}>
+                      <View style={styles.openMatchHeader}>
+                        <Text style={styles.openMatchSport}>{match.sport}</Text>
+                        <View style={styles.openMatchSlots}>
+                          <Users size={13} color={colors.primary[600]} />
+                          <Text style={styles.openMatchSlotsText}>{totalSlots}/{match.maxPlayers}</Text>
+                        </View>
+                      </View>
+                      {bk?.startsAt && (
+                        <Text style={styles.openMatchTime}>
+                          {formatTime(bk.startsAt)} → {bk.endsAt ? formatTime(bk.endsAt) : ''}
+                        </Text>
+                      )}
+                      {estimatedQuota > 0 && (
+                        <Text style={styles.openMatchQuota}>{formatCurrency(estimatedQuota)}/jogador</Text>
+                      )}
+                      <Text style={styles.openMatchCta}>Toque para ver e participar →</Text>
+                    </Card>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+
           {/* ── Avaliações ── */}
           {reviews.length > 0 && (
             <View style={styles.section}>
@@ -617,4 +664,15 @@ const styles = StyleSheet.create({
   bottomInfo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   bottomDate: { fontSize: 13, color: colors.text.secondary },
   bottomPrice: { fontSize: 20, fontWeight: '800', color: colors.primary[600] },
+
+  // Partidas abertas
+  openMatchesHint: { fontSize: 13, color: colors.text.secondary, marginTop: -spacing.xs },
+  openMatchCard: { gap: 3, borderLeftWidth: 3, borderLeftColor: colors.primary[400] },
+  openMatchHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  openMatchSport: { fontSize: 14, fontWeight: '700', color: colors.text.primary },
+  openMatchSlots: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  openMatchSlotsText: { fontSize: 13, fontWeight: '600', color: colors.primary[600] },
+  openMatchTime: { fontSize: 13, color: colors.text.secondary },
+  openMatchQuota: { fontSize: 14, fontWeight: '700', color: colors.primary[600] },
+  openMatchCta: { fontSize: 12, color: colors.primary[500], marginTop: 2 },
 });

@@ -22,6 +22,7 @@ import { colors, spacing } from '../../../theme';
 import { formatCurrency, formatDate, formatDateTime, formatTime } from '../../../utils/format';
 
 const statusLabel: Record<string, string> = {
+  open: 'Partida aberta',
   pending: 'Pendente',
   confirmed: 'Confirmada',
   completed: 'Concluída',

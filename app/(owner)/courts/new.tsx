@@ -28,7 +28,6 @@ const AMENITIES_OPTIONS = ['Vestiário', 'Estacionamento', 'Iluminação', 'Gram
 
 const schema = z.object({
   name: z.string().min(2, 'Nome muito curto'),
-  sport: z.string().min(1, 'Selecione o esporte'),
   description: z.string().optional(),
   addressLine: z.string().min(5, 'Endereço obrigatório'),
   city: z.string().min(2, 'Selecione a cidade'),
@@ -46,12 +45,13 @@ const STATE_OPTIONS = STATES.map((s) => ({ label: `${s.uf} – ${s.name}`, value
 
 export default function NewCourtScreen() {
   const queryClient = useQueryClient();
-  const [selectedSport, setSelectedSport] = useState('');
+  const [selectedSports, setSelectedSports] = useState<string[]>([]);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
+  const [sportsError, setSportsError] = useState('');
 
   const { control, handleSubmit, watch, setValue, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { name: '', sport: '', description: '', addressLine: '', city: '', state: 'SP', zip: '', rules: '', mapsUrl: '' },
+    defaultValues: { name: '', description: '', addressLine: '', city: '', state: 'SP', zip: '', rules: '', mapsUrl: '' },
   });
 
   const selectedState = watch('state');
@@ -61,14 +61,16 @@ export default function NewCourtScreen() {
     mutationFn: (data: FormData) =>
       courtsService.create({
         ...data,
+        sports: selectedSports,
+        sport: selectedSports[0] ?? '',
         latitude: data.latitude ? Number(data.latitude) : -23.5505,
         longitude: data.longitude ? Number(data.longitude) : -46.6333,
         amenities: selectedAmenities as unknown as string[],
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['owner-courts'], exact: false });
-      reset({ state: 'SP', city: '', name: '', sport: '', description: '', addressLine: '', zip: '', rules: '', mapsUrl: '' });
-      setSelectedSport('');
+      reset({ state: 'SP', city: '', name: '', description: '', addressLine: '', zip: '', rules: '', mapsUrl: '' });
+      setSelectedSports([]);
       setSelectedAmenities([]);
       Alert.alert('Quadra cadastrada!', 'Sua quadra foi criada com sucesso.', [
         { text: 'OK', onPress: () => router.back() },
@@ -80,11 +82,26 @@ export default function NewCourtScreen() {
     },
   });
 
+  const toggleSport = (sport: string) => {
+    setSelectedSports((prev) =>
+      prev.includes(sport) ? prev.filter((s) => s !== sport) : [...prev, sport]
+    );
+    setSportsError('');
+  };
+
   const toggleAmenity = (amenity: string) => {
     setSelectedAmenities((prev) =>
       prev.includes(amenity) ? prev.filter((a) => a !== amenity) : [...prev, amenity]
     );
   };
+
+  function onSubmit(data: FormData) {
+    if (selectedSports.length === 0) {
+      setSportsError('Selecione ao menos um esporte');
+      return;
+    }
+    createMutation.mutate(data);
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -106,18 +123,18 @@ export default function NewCourtScreen() {
             />
 
             <View>
-              <Text style={styles.label}>Esporte</Text>
+              <Text style={styles.label}>Esportes <Text style={styles.labelHint}>(selecione um ou mais)</Text></Text>
               <View style={styles.chipsRow}>
                 {SPORTS.map((sport) => (
                   <Chip
                     key={sport}
                     label={sport}
-                    selected={selectedSport === sport}
-                    onPress={() => { setSelectedSport(sport); setValue('sport', sport); }}
+                    selected={selectedSports.includes(sport)}
+                    onPress={() => toggleSport(sport)}
                   />
                 ))}
               </View>
-              {errors.sport && <Text style={styles.errorText}>{errors.sport.message}</Text>}
+              {sportsError ? <Text style={styles.errorText}>{sportsError}</Text> : null}
             </View>
 
             <Controller
@@ -221,7 +238,7 @@ export default function NewCourtScreen() {
 
             <Button
               label="Cadastrar quadra"
-              onPress={handleSubmit((d) => createMutation.mutate(d))}
+              onPress={handleSubmit(onSubmit)}
               loading={isSubmitting || createMutation.isPending}
               fullWidth
               size="lg"
@@ -241,6 +258,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: colors.text.primary, marginBottom: spacing.sm },
   form: { gap: spacing.md },
   label: { fontSize: 14, fontWeight: '500', color: colors.text.primary, marginBottom: 6 },
+  labelHint: { fontSize: 12, fontWeight: '400', color: colors.text.secondary },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   errorText: { fontSize: 12, color: colors.error, marginTop: 4 },
 });

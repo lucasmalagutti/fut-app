@@ -30,6 +30,7 @@ export function Badge({ label, variant = 'neutral', style }: BadgeProps) {
 
 export function bookingStatusBadge(status: string): BadgeVariant {
   const map: Record<string, BadgeVariant> = {
+    open: 'primary',
     pending: 'warning',
     confirmed: 'info',
     completed: 'success',
