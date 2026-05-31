@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { MessageCircle } from 'lucide-react-native';
-import { FlatList, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { useCallback } from 'react';
+import { FlatList, RefreshControl, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { usePullToRefresh } from '../../../hooks/usePullToRefresh';
 import { Avatar } from '../../../components/ui/Avatar';
 import { Card } from '../../../components/ui/Card';
 import { EmptyState } from '../../../components/ui/EmptyState';
@@ -18,6 +20,9 @@ export default function OwnerChatListScreen() {
     queryKey: ['chat-threads'],
     queryFn: () => chatService.listThreads(),
   });
+
+  const refetchThreads = useCallback(() => refetch(), [refetch]);
+  const { refreshing, onRefresh } = usePullToRefresh(refetchThreads);
 
   function getOtherUser(thread: (typeof threads)[0]) {
     return thread.userAId === user?.id ? thread.userB : thread.userA;
@@ -68,8 +73,9 @@ export default function OwnerChatListScreen() {
               </Card>
             );
           }}
-          onRefresh={refetch}
-          refreshing={isLoading}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary[600]} />
+          }
           contentContainerStyle={styles.list}
         />
       )}

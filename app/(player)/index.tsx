@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { MapPin, Search } from "lucide-react-native";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   FlatList,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -11,6 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { mergeRefetch, usePullToRefresh } from "../../hooks/usePullToRefresh";
 import { CourtCard } from "../../components/courts/CourtCard";
 import { Chip } from "../../components/ui/Chip";
 import { EmptyState } from "../../components/ui/EmptyState";
@@ -48,6 +50,9 @@ export default function PlayerHomeScreen() {
       }),
     staleTime: 60_000,
   });
+
+  const refetchCourts = useCallback(() => refetch(), [refetch]);
+  const { refreshing, onRefresh } = usePullToRefresh(refetchCourts);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -125,8 +130,9 @@ export default function PlayerHomeScreen() {
           )}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
-          onRefresh={refetch}
-          refreshing={isLoading}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary[600]} />
+          }
         />
       )}
     </SafeAreaView>

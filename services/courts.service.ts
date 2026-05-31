@@ -1,14 +1,12 @@
+import { resolveMediaUrl } from '../utils/media';
 import { api } from './api';
 import type { Court, CourtBlock, CourtFilters, CourtSchedule, PaginatedResponse, Review, TimeSlot } from '../types';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
 
-/** Converte URL relativa (/storage/...) em absoluta */
-export function resolvePhotoUrl(url: string): string {
-  if (!url) return '';
-  if (url.startsWith('http')) return url;
-  return `${API_URL}${url}`;
-}
+/** @deprecated Use resolveMediaUrl — mantido para compatibilidade */
+export const resolvePhotoUrl = resolveMediaUrl;
+export { resolveMediaUrl };
 
 export const courtsService = {
   list: (filters?: CourtFilters) =>

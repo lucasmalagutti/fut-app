@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { CalendarDays, LayoutDashboard, MessageCircle, User, Wallet } from 'lucide-react-native';
+import { Bell, CalendarDays, LayoutDashboard, User, Wallet } from 'lucide-react-native';
 import { colors } from '../../theme';
 
 export default function OwnerLayout() {
@@ -40,10 +40,10 @@ export default function OwnerLayout() {
         }}
       />
       <Tabs.Screen
-        name="chat/index"
+        name="notifications"
         options={{
-          title: 'Mensagens',
-          tabBarIcon: ({ color, size }) => <MessageCircle size={size} color={color} />,
+          title: 'Alertas',
+          tabBarIcon: ({ color, size }) => <Bell size={size} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -56,6 +56,7 @@ export default function OwnerLayout() {
       {/* Hide nested screens */}
       <Tabs.Screen name="courts/new" options={{ href: null }} />
       <Tabs.Screen name="courts/[id]" options={{ href: null }} />
+      <Tabs.Screen name="chat/index" options={{ href: null }} />
       <Tabs.Screen name="chat/[threadId]" options={{ href: null }} />
     </Tabs>
   );

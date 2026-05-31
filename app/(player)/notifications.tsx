@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react-native';
-import { FlatList, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { useCallback } from 'react';
+import { FlatList, Pressable, RefreshControl, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -10,20 +12,38 @@ import { formatRelativeTime } from '../../utils/format';
 
 const typeLabel: Record<string, string> = {
   invite: 'Convite para partida',
+  match_invite: 'Convite para partida',
+  match_joined: 'Jogador entrou na partida',
+  match_cancelled_quorum: 'Partida cancelada',
+  payment_charged: 'Pagamento realizado',
+  pix_payment_required: 'PIX pendente',
+  account_blocked_pix: 'Conta bloqueada',
+  payout_completed: 'Saque realizado',
+  payment_charge_failed: 'Falha na cobrança',
   booking_confirmed: 'Reserva confirmada',
+  deposit_confirmed: 'Depósito confirmado',
   booking_reminder: 'Lembrete de reserva',
-  payment_received: 'Pagamento recebido',
+  payment_received: 'Reserva recebida',
+  owner_funds_available: 'Valor disponível para saque',
   user_banned: 'Conta suspensa',
   user_warned: 'Advertência',
 };
 
+function notificationText(item: { type: string; payload?: Record<string, unknown> }) {
+  if (typeof item.payload?.message === 'string') return item.payload.message;
+  return typeLabel[item.type] ?? item.type;
+}
+
 export default function NotificationsScreen() {
   const queryClient = useQueryClient();
 
-  const { data: notifications = [], isLoading } = useQuery({
+  const { data: notifications = [], isLoading, refetch } = useQuery({
     queryKey: ['notifications'],
     queryFn: () => notificationsService.list(),
   });
+
+  const refetchList = useCallback(() => refetch(), [refetch]);
+  const { refreshing, onRefresh } = usePullToRefresh(refetchList);
 
   const readAllMutation = useMutation({
     mutationFn: () => notificationsService.readAll(),
@@ -59,6 +79,9 @@ export default function NotificationsScreen() {
         <FlatList
           data={notifications}
           keyExtractor={(n) => n.id}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary[600]} />
+          }
           renderItem={({ item }) => {
             const isUnread = !item.readAt;
             return (
@@ -67,6 +90,9 @@ export default function NotificationsScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.itemTitle}>
                     {typeLabel[item.type] ?? item.type}
+                  </Text>
+                  <Text style={styles.itemBody} numberOfLines={3}>
+                    {notificationText(item)}
                   </Text>
                   <Text style={styles.itemTime}>{formatRelativeTime(item.createdAt)}</Text>
                 </View>
@@ -97,5 +123,6 @@ const styles = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary[600] },
   dotRead: { backgroundColor: colors.neutral[300] },
   itemTitle: { fontSize: 14, fontWeight: '600', color: colors.text.primary },
+  itemBody: { fontSize: 13, color: colors.text.secondary, marginTop: 2 },
   itemTime: { fontSize: 12, color: colors.text.secondary, marginTop: 2 },
 });

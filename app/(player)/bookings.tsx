@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { router } from 'expo-router';
 import { CalendarDays, Users } from 'lucide-react-native';
 import { useState } from 'react';
@@ -19,6 +20,7 @@ import { Chip } from '../../components/ui/Chip';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { bookingsService } from '../../services/bookings.service';
+import { mergeRefetch, usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { matchesService } from '../../services/matches.service';
 import { colors, spacing } from '../../theme';
 import type { Booking, Match } from '../../types';
@@ -169,10 +171,11 @@ export default function BookingsScreen() {
 
   const isLoading = loadingBookings || loadingMatches;
 
-  function refetch() {
-    refetchBookings();
-    refetchMatches();
-  }
+  const refetchAll = useCallback(
+    () => mergeRefetch(refetchBookings, refetchMatches),
+    [refetchBookings, refetchMatches],
+  );
+  const { refreshing, onRefresh } = usePullToRefresh(refetchAll);
 
   const bookings: Booking[] = bookingsData?.data ?? [];
 
@@ -254,7 +257,9 @@ export default function BookingsScreen() {
             return null;
           }}
           contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary[600]} />
+          }
           showsVerticalScrollIndicator={false}
         />
       )}

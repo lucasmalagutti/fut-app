@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDownLeft, ArrowUpRight, Plus, Trash2 } from 'lucide-react-native';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -12,6 +12,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { RefreshableScrollView } from '../../components/ui/RefreshableScrollView';
+import { mergeRefetch, usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -87,20 +89,26 @@ export default function OwnerFinanceScreen() {
   const [bankForm, setBankForm] = useState<BankForm>({ ...DEFAULT_BANK_FORM });
   const [errors, setErrors] = useState<Partial<Record<keyof BankForm, string>>>({});
 
-  const { data: wallet, isLoading: loadingWallet } = useQuery({
+  const { data: wallet, isLoading: loadingWallet, refetch: refetchWallet } = useQuery({
     queryKey: ['wallet'],
     queryFn: () => walletService.get(),
   });
 
-  const { data: transactions = [] } = useQuery({
+  const { data: transactions = [], refetch: refetchTxs } = useQuery({
     queryKey: ['wallet-transactions'],
     queryFn: () => walletService.getTransactions(),
   });
 
-  const { data: bankAccounts = [] } = useQuery({
+  const { data: bankAccounts = [], refetch: refetchBanks } = useQuery({
     queryKey: ['bank-accounts'],
     queryFn: () => walletService.listBankAccounts(),
   });
+
+  const refetchAll = useCallback(
+    () => mergeRefetch(refetchWallet, refetchTxs, refetchBanks),
+    [refetchWallet, refetchTxs, refetchBanks],
+  );
+  const { refreshing, onRefresh } = usePullToRefresh(refetchAll);
 
   const addBankMutation = useMutation({
     mutationFn: (data: Omit<BankForm, 'pixKey'> & { pixKey?: string }) =>
@@ -130,11 +138,16 @@ export default function OwnerFinanceScreen() {
   const payoutMutation = useMutation({
     mutationFn: (data: { bankAccountId: string; amount: number }) =>
       walletService.requestPayout(data),
-    onSuccess: () => {
+    onSuccess: (data: { message?: string }) => {
       queryClient.invalidateQueries({ queryKey: ['wallet'] });
+      queryClient.invalidateQueries({ queryKey: ['wallet-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
       setShowPayoutModal(false);
       setPayoutAmount('');
-      Alert.alert('Saque solicitado!', 'Seu saque será processado em breve.');
+      Alert.alert(
+        'Saque realizado',
+        data?.message ?? 'Seu saque foi processado com sucesso.',
+      );
     },
     onError: (err: unknown) => {
       const msg = (err as any)?.response?.data?.message ?? 'Erro ao solicitar saque.';
@@ -182,21 +195,28 @@ export default function OwnerFinanceScreen() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
-  if (loadingWallet) return <LoadingSpinner fullScreen />;
-
   const defaultAccount = bankAccounts[0];
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <RefreshableScrollView
+        showsVerticalScrollIndicator={false}
+        refreshing={refreshing || loadingWallet}
+        onRefresh={onRefresh}
+      >
         <View style={styles.header}>
           <Text style={styles.title}>Finanças</Text>
         </View>
 
         {/* Saldo */}
         <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Saldo disponível</Text>
+          <Text style={styles.balanceLabel}>Saldo disponível para saque</Text>
           <Text style={styles.balance}>{formatCurrency(wallet?.balance ?? 0)}</Text>
+          {(wallet?.pendingBalance ?? 0) > 0 && (
+            <Text style={styles.pendingLabel}>
+              Pendente (partidas em andamento): {formatCurrency(wallet!.pendingBalance!)}
+            </Text>
+          )}
           <Button
             label="Solicitar saque"
             variant="secondary"
@@ -290,7 +310,7 @@ export default function OwnerFinanceScreen() {
             })
           )}
         </View>
-      </ScrollView>
+      </RefreshableScrollView>
 
       {/* ── Modal: Nova conta bancária ── */}
       <Modal visible={showBankModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeModal}>
@@ -464,6 +484,7 @@ const styles = StyleSheet.create({
   },
   balanceLabel: { fontSize: 13, color: 'rgba(255,255,255,0.8)' },
   balance: { fontSize: 36, fontWeight: '800', color: colors.white },
+  pendingLabel: { fontSize: 13, color: 'rgba(255,255,255,0.9)', marginTop: spacing.sm },
   section: { padding: spacing.lg, paddingTop: spacing.sm, gap: spacing.md },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: colors.text.primary },

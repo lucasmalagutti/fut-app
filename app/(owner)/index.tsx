@@ -1,7 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { TrendingUp } from 'lucide-react-native';
-import { FlatList, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback } from 'react';
+import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshableScrollView } from '../../components/ui/RefreshableScrollView';
+import { mergeRefetch, usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { BookingCard } from '../../components/bookings/BookingCard';
 import { Card } from '../../components/ui/Card';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -14,21 +17,27 @@ import { formatCurrency } from '../../utils/format';
 export default function OwnerDashboardScreen() {
   const user = useAuthStore((s) => s.user);
 
-  const { data: wallet } = useQuery({
+  const { data: wallet, refetch: refetchWallet } = useQuery({
     queryKey: ['wallet'],
     queryFn: () => walletService.get(),
   });
 
-  const { data: bookingsData, isLoading } = useQuery({
+  const { data: bookingsData, isLoading, refetch: refetchBookings } = useQuery({
     queryKey: ['bookings', 'confirmed'],
     queryFn: () => bookingsService.list({ status: 'confirmed', limit: 10 }),
   });
+
+  const refetchAll = useCallback(
+    () => mergeRefetch(refetchWallet, refetchBookings),
+    [refetchWallet, refetchBookings],
+  );
+  const { refreshing, onRefresh } = usePullToRefresh(refetchAll);
 
   const upcomingBookings = bookingsData?.data ?? [];
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <RefreshableScrollView showsVerticalScrollIndicator={false} refreshing={refreshing} onRefresh={onRefresh}>
         <View style={styles.header}>
           <Text style={styles.greeting}>Olá, {user?.name?.split(' ')[0]} 👋</Text>
           <Text style={styles.subTitle}>Painel do Dono</Text>
@@ -82,7 +91,7 @@ export default function OwnerDashboardScreen() {
             </View>
           )}
         </View>
-      </ScrollView>
+      </RefreshableScrollView>
     </SafeAreaView>
   );
 }

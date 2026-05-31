@@ -62,6 +62,7 @@ export default function PlayerLayout() {
       <Tabs.Screen name="chat/[threadId]" options={{ href: null }} />
       <Tabs.Screen name="matches/index" options={{ href: null }} />
       <Tabs.Screen name="matches/[id]" options={{ href: null }} />
+      <Tabs.Screen name="cards" options={{ href: null }} />
     </Tabs>
   );
 }

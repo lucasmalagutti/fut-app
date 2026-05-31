@@ -15,9 +15,12 @@ import {
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
+import { PaymentMethodPicker, type AutoPayMethod } from '../../../components/payments/PaymentMethodPicker';
 import { bookingsService } from '../../../services/bookings.service';
 import { courtsService } from '../../../services/courts.service';
 import { matchesService } from '../../../services/matches.service';
+import { paymentsService } from '../../../services/payments.service';
+import { walletService } from '../../../services/wallet.service';
 import { colors, spacing } from '../../../theme';
 import { formatCurrency, formatDate } from '../../../utils/format';
 
@@ -56,12 +59,24 @@ export default function NewMatchScreen() {
   const [minPlayers, setMinPlayers] = useState(6);
   const [maxPlayers, setMaxPlayers] = useState(10);
   const [isPublic, setIsPublic] = useState(true);
+  const [payMethod, setPayMethod] = useState<AutoPayMethod>('wallet');
+  const [payCardId, setPayCardId] = useState<string | undefined>();
   const [done, setDone] = useState(false);
   const [createdMatchId, setCreatedMatchId] = useState<string | null>(null);
 
   const { data: court, isLoading } = useQuery({
     queryKey: ['court', courtId],
     queryFn: () => courtsService.get(courtId),
+  });
+
+  const { data: wallet } = useQuery({
+    queryKey: ['wallet'],
+    queryFn: () => walletService.get(),
+  });
+
+  const { data: cards = [] } = useQuery({
+    queryKey: ['cards'],
+    queryFn: () => paymentsService.listCards(),
   });
 
   // Deriva lista de esportes da quadra (suporta JSON array ou string simples)
@@ -88,12 +103,20 @@ export default function NewMatchScreen() {
 
         const booking = await bookingsService.create({ courtId, startsAt, endsAt });
 
+        if (payMethod === 'card' && !payCardId) {
+          throw new Error('Selecione um cartão para a cobrança automática.');
+        }
+
         const match = await matchesService.create({
           bookingId: booking.id,
           sport: effectiveSport,
           minPlayers,
           maxPlayers,
           isPublic,
+          payment: {
+            preferredPayMethod: payMethod,
+            ...(payMethod === 'card' && payCardId ? { preferredCardId: payCardId } : {}),
+          },
         });
 
         queryClient.invalidateQueries({ queryKey: ['matches'] });
@@ -128,7 +151,7 @@ export default function NewMatchScreen() {
           <Text style={styles.successTitle}>Partida criada!</Text>
           <Text style={styles.successSubtitle}>
             Aguardando {minPlayers} jogadores para confirmar.{'\n'}
-            O pagamento sera cobrado automaticamente quando o quorum for atingido.
+            Sua cota será cobrada automaticamente 2 horas antes do jogo, conforme a forma de pagamento escolhida.
           </Text>
           <Button
             label="Ver minha partida"
@@ -259,6 +282,22 @@ export default function NewMatchScreen() {
             <Text style={styles.visHint}>Apenas por convite</Text>
           </Pressable>
         </View>
+
+        <PaymentMethodPicker
+          method={payMethod}
+          onMethodChange={(m) => {
+            setPayMethod(m);
+            if (m === 'card') {
+              const def = cards.find((c) => c.isDefault) ?? cards[0];
+              if (def) setPayCardId(def.id);
+            }
+          }}
+          cardId={payCardId}
+          onCardIdChange={setPayCardId}
+          cards={cards}
+          walletBalance={wallet?.balance ?? 0}
+          disabled={createMutation.isPending}
+        />
 
         {/* Estimativa de cota */}
         <Card style={styles.quotaCard}>

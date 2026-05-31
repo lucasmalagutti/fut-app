@@ -12,6 +12,7 @@ interface SignupData {
 interface LoginData {
   email: string;
   password: string;
+  keepConnected?: boolean;
 }
 
 export const authService = {

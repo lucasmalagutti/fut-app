@@ -43,7 +43,11 @@ export default function LoginScreen() {
 
   const onSubmit = async (data: FormData) => {
     try {
-      const res = await authService.login({ email: data.email, password: data.password });
+      const res = await authService.login({
+        email: data.email,
+        password: data.password,
+        keepConnected: remember,
+      });
       await signIn(res, remember);
       if (res.user.role === 'owner') {
         router.replace('/(owner)');

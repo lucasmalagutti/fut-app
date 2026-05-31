@@ -1,9 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Users } from 'lucide-react-native';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -17,6 +16,7 @@ import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
+import { mergeRefetch, usePullToRefresh } from '../../../hooks/usePullToRefresh';
 import { matchesService } from '../../../services/matches.service';
 import { colors, spacing } from '../../../theme';
 import type { Match } from '../../../types';
@@ -97,7 +97,6 @@ function MatchCard({
 
 export default function MatchesScreen() {
   const [tab, setTab] = useState<TabKey>('open');
-  const [joiningId, setJoiningId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { data: openMatches = [], isLoading: loadingOpen, refetch: refetchOpen } = useQuery({
@@ -112,24 +111,13 @@ export default function MatchesScreen() {
     enabled: tab === 'mine',
   });
 
-  const joinMutation = useMutation({
-    mutationFn: (matchId: string) => matchesService.join(matchId),
-    onMutate: (matchId) => setJoiningId(matchId),
-    onSuccess: (_, matchId) => {
-      queryClient.invalidateQueries({ queryKey: ['matches'] });
-      setJoiningId(null);
-      router.push({ pathname: '/(player)/matches/[id]', params: { id: matchId } });
-    },
-    onError: (err: unknown) => {
-      setJoiningId(null);
-      const msg = (err as any)?.response?.data?.message ?? 'Erro ao entrar na partida.';
-      Alert.alert('Erro', msg);
-    },
-  });
-
   const isLoading = tab === 'open' ? loadingOpen : loadingMine;
   const matches = tab === 'open' ? openMatches : myMatches;
-  const refetch = tab === 'open' ? refetchOpen : refetchMine;
+  const refetchAll = useCallback(
+    () => mergeRefetch(refetchOpen, refetchMine),
+    [refetchOpen, refetchMine],
+  );
+  const { refreshing, onRefresh } = usePullToRefresh(refetchAll);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -176,12 +164,15 @@ export default function MatchesScreen() {
               match={item}
               onPress={() => router.push({ pathname: '/(player)/matches/[id]', params: { id: item.id } })}
               showJoin={tab === 'open' && !item.confirmedAt && !item.closedAt}
-              onJoin={() => joinMutation.mutate(item.id)}
-              joining={joiningId === item.id}
+              onJoin={() =>
+                router.push({ pathname: '/(player)/matches/[id]', params: { id: item.id } })
+              }
             />
           )}
           contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary[600]} />
+          }
         />
       )}
     </SafeAreaView>

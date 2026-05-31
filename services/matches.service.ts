@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { Match, MatchParticipant } from '../types';
+import type { Match, MatchParticipant, MatchPaymentPreference } from '../types';
 
 export const matchesService = {
   // Criar partida a partir de uma reserva
@@ -9,6 +9,7 @@ export const matchesService = {
     minPlayers: number;
     maxPlayers: number;
     isPublic?: boolean;
+    payment: MatchPaymentPreference;
   }) => api.post<Match>('/matches', data).then((r) => r.data),
 
   // Listar partidas abertas
@@ -23,8 +24,8 @@ export const matchesService = {
     api.get<Match & { estimatedQuota: number; totalSlots: number }>(`/matches/${id}`).then((r) => r.data),
 
   // Ingressar na partida
-  join: (matchId: string, data?: { guestName?: string }) =>
-    api.post<MatchParticipant>(`/matches/${matchId}/join`, data ?? {}).then((r) => r.data),
+  join: (matchId: string, data: { payment: MatchPaymentPreference; guestName?: string }) =>
+    api.post<MatchParticipant>(`/matches/${matchId}/join`, data).then((r) => r.data),
 
   // Sair da partida
   leave: (matchId: string) =>
@@ -35,8 +36,15 @@ export const matchesService = {
     api.post(`/matches/${matchId}/invite`, { toIds }).then((r) => r.data),
 
   // Responder convite
-  respond: (matchId: string, inviteId: string, status: 'accepted' | 'declined') =>
-    api.post(`/matches/${matchId}/respond`, { inviteId, status }).then((r) => r.data),
+  respond: (
+    matchId: string,
+    data: {
+      inviteId: string;
+      status: 'accepted' | 'declined';
+      payment?: MatchPaymentPreference;
+      guestName?: string;
+    },
+  ) => api.post(`/matches/${matchId}/respond`, data).then((r) => r.data),
 
   // Check-in
   checkIn: (matchId: string) =>

@@ -1,18 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Calendar, ChevronLeft, Clock, MapPin, Star } from 'lucide-react-native';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Alert,
   Modal,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { RefreshableScrollView } from '../../../components/ui/RefreshableScrollView';
+import { usePullToRefresh } from '../../../hooks/usePullToRefresh';
 import { Badge, bookingStatusBadge } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
@@ -36,10 +37,13 @@ export default function BookingDetailScreen() {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
 
-  const { data: booking, isLoading } = useQuery({
+  const { data: booking, isLoading, refetch } = useQuery({
     queryKey: ['booking', id],
     queryFn: () => bookingsService.get(id),
   });
+
+  const refetchBooking = useCallback(() => refetch(), [refetch]);
+  const { refreshing, onRefresh } = usePullToRefresh(refetchBooking);
 
   const cancelMutation = useMutation({
     mutationFn: () => bookingsService.cancel(id),
@@ -61,7 +65,7 @@ export default function BookingDetailScreen() {
     onError: () => Alert.alert('Erro', 'Não foi possível enviar a avaliação.'),
   });
 
-  if (isLoading) return <LoadingSpinner fullScreen />;
+  if (isLoading && !booking) return <LoadingSpinner fullScreen />;
   if (!booking) return null;
 
   const canCancel = booking.status === 'pending' || booking.status === 'confirmed';
@@ -69,7 +73,7 @@ export default function BookingDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <RefreshableScrollView contentContainerStyle={styles.scroll} refreshing={refreshing} onRefresh={onRefresh}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <ChevronLeft size={24} color={colors.text.primary} />
           <Text style={styles.backText}>Minhas Reservas</Text>
@@ -163,7 +167,7 @@ export default function BookingDetailScreen() {
             />
           )}
         </View>
-      </ScrollView>
+      </RefreshableScrollView>
 
       {/* Review modal */}
       <Modal visible={showReviewModal} transparent animationType="slide">

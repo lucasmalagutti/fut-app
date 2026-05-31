@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image, ImageStyle, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { resolvePhotoUrl } from '../../services/courts.service';
+import { resolveMediaUrl } from '../../utils/media';
 import { colors, radius } from '../../theme';
 import { getInitials } from '../../utils/format';
 
@@ -18,7 +18,7 @@ export function Avatar({ name, uri, size = 40, style }: AvatarProps) {
   if (uri) {
     return (
       <Image
-        source={{ uri: resolvePhotoUrl(uri) }}
+        source={{ uri: resolveMediaUrl(uri) }}
         style={[{ width: size, height: size, borderRadius: size / 2 } as ImageStyle, style as ImageStyle]}
       />
     );

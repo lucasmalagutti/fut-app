@@ -1,18 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Send } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  RefreshControl,
   SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { mergeRefetch, usePullToRefresh } from '../../../hooks/usePullToRefresh';
 import { Avatar } from '../../../components/ui/Avatar';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { chatService } from '../../../services/chat.service';
@@ -28,7 +30,7 @@ export default function ChatConversationScreen() {
   const [message, setMessage] = useState('');
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
-  const { data: threads = [] } = useQuery({
+  const { data: threads = [], refetch: refetchThreads } = useQuery({
     queryKey: ['chat-threads'],
     queryFn: () => chatService.listThreads(),
   });
@@ -36,11 +38,17 @@ export default function ChatConversationScreen() {
   const thread = threads.find((t) => t.id === threadId);
   const otherUser = thread?.userAId === user?.id ? thread?.userB : thread?.userA;
 
-  const { data: messages = [], isLoading } = useQuery({
+  const { data: messages = [], isLoading, refetch: refetchMessages } = useQuery({
     queryKey: ['chat-messages', threadId],
     queryFn: () => chatService.getMessages(threadId),
-    refetchInterval: 3000,
+    refetchInterval: 5000,
   });
+
+  const refetchAll = useCallback(
+    () => mergeRefetch(refetchThreads, refetchMessages),
+    [refetchThreads, refetchMessages],
+  );
+  const { refreshing, onRefresh } = usePullToRefresh(refetchAll);
 
   const sendMutation = useMutation({
     mutationFn: (body: string) => chatService.sendMessage(threadId, body),
@@ -96,6 +104,9 @@ export default function ChatConversationScreen() {
             }}
             contentContainerStyle={styles.messageList}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary[600]} />
+            }
           />
         )}
 

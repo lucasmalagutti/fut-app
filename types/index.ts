@@ -4,9 +4,9 @@ export type CourtStatus = 'active' | 'inactive';
 export type BookingStatus = 'open' | 'pending' | 'confirmed' | 'completed' | 'cancelled';
 export type InviteStatus = 'pending' | 'accepted' | 'declined' | 'cancelled';
 export type PartStatus = 'joined' | 'paid' | 'unpaid' | 'checked_in' | 'cancelled';
-export type PayMethod = 'card' | 'pix';
+export type PayMethod = 'card' | 'pix' | 'wallet';
 export type PayStatus = 'pending' | 'paid' | 'refunded' | 'failed';
-export type TxType = 'booking_charge' | 'payout' | 'refund' | 'fee' | 'adjustment';
+export type TxType = 'booking_charge' | 'payout' | 'refund' | 'fee' | 'adjustment' | 'deposit';
 export type TxStatus = 'pending' | 'completed' | 'failed';
 export type ReportStatus = 'open' | 'reviewed' | 'closed';
 
@@ -135,7 +135,14 @@ export interface MatchParticipant {
   quota?: number;
   paymentStatus: PartStatus;
   paymentId?: string;
+  preferredPayMethod?: PayMethod;
+  preferredCardId?: string;
   user?: User;
+}
+
+export interface MatchPaymentPreference {
+  preferredPayMethod: 'wallet' | 'card';
+  preferredCardId?: string;
 }
 
 export interface Card {
@@ -162,10 +169,13 @@ export interface BankAccount {
 }
 
 export interface Wallet {
-  id: string;
-  userId: string;
+  id?: string;
+  userId?: string;
   balance: number;
-  updatedAt: string;
+  pendingBalance?: number;
+  availableBalance?: number;
+  updatedAt?: string;
+  txs?: Transaction[];
 }
 
 export interface Transaction {
@@ -201,6 +211,8 @@ export interface Payout {
   status: TxStatus;
   gatewayRef?: string;
   createdAt: string;
+  /** Mensagem mock de confirmação (saque imediato) */
+  message?: string;
 }
 
 export interface Review {

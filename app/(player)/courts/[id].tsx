@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Clock, ExternalLink, MapPin, Star, Users } from 'lucide-react-native';
 import { useState } from 'react';
@@ -22,6 +23,8 @@ import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import { Chip } from '../../../components/ui/Chip';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
+import { RefreshableScrollView } from '../../../components/ui/RefreshableScrollView';
+import { mergeRefetch, usePullToRefresh } from '../../../hooks/usePullToRefresh';
 import { courtsService, resolvePhotoUrl } from '../../../services/courts.service';
 import { matchesService } from '../../../services/matches.service';
 import { colors, spacing } from '../../../theme';
@@ -116,29 +119,35 @@ export default function CourtDetailScreen() {
   const [endSlot, setEndSlot] = useState<MinuteSlot | null>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
 
-  const { data: court, isLoading } = useQuery({
+  const { data: court, isLoading, refetch: refetchCourt } = useQuery({
     queryKey: ['court', id],
     queryFn: () => courtsService.get(id),
   });
 
-  const { data: availability, isLoading: loadingSlots } = useQuery({
+  const { data: availability, isLoading: loadingSlots, refetch: refetchAvail } = useQuery({
     queryKey: ['availability', id, selectedDate],
     queryFn: () => courtsService.getAvailability(id, selectedDate),
     enabled: !!id && !!selectedDate,
   });
 
-  const { data: reviews = [] } = useQuery({
+  const { data: reviews = [], refetch: refetchReviews } = useQuery({
     queryKey: ['reviews', id],
     queryFn: () => courtsService.getReviews(id),
   });
 
-  const { data: openMatches = [] } = useQuery({
+  const { data: openMatches = [], refetch: refetchMatches } = useQuery({
     queryKey: ['matches', 'open', id, selectedDate],
     queryFn: () => matchesService.findOpen({ courtId: id, date: selectedDate }),
     enabled: !!id && !!selectedDate,
   });
 
-  if (isLoading) return <LoadingSpinner fullScreen />;
+  const refetchAll = useCallback(
+    () => mergeRefetch(refetchCourt, refetchAvail, refetchReviews, refetchMatches),
+    [refetchCourt, refetchAvail, refetchReviews, refetchMatches],
+  );
+  const { refreshing, onRefresh } = usePullToRefresh(refetchAll);
+
+  if (isLoading && !court) return <LoadingSpinner fullScreen />;
   if (!court) return null;
 
   const photos = court.photos ?? [];
@@ -244,7 +253,12 @@ export default function CourtDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <RefreshableScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+      >
 
         {/* ── Carrossel de fotos ── */}
         <View style={styles.imageContainer}>
@@ -533,7 +547,7 @@ export default function CourtDetailScreen() {
             </View>
           )}
         </View>
-      </ScrollView>
+      </RefreshableScrollView>
 
       {/* ── Bottom bar ── */}
       <View style={styles.bottomBar}>

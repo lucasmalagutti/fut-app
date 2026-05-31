@@ -1,9 +1,12 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
-import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { RefreshableScrollView } from '../../components/ui/RefreshableScrollView';
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { z } from 'zod';
 import { Avatar } from '../../components/ui/Avatar';
 import { Button } from '../../components/ui/Button';
@@ -22,6 +25,19 @@ type FormData = z.infer<typeof schema>;
 export default function PlayerProfileScreen() {
   const { user, setUser, signOut } = useAuthStore();
   const queryClient = useQueryClient();
+
+  const { refetch } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => authService.getMe(),
+    enabled: !!user,
+  });
+
+  const refreshProfile = useCallback(async () => {
+    const me = await authService.getMe();
+    setUser(me);
+    await refetch();
+  }, [refetch, setUser]);
+  const { refreshing, onRefresh } = usePullToRefresh(refreshProfile);
 
   const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -94,7 +110,7 @@ export default function PlayerProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <RefreshableScrollView contentContainerStyle={styles.scroll} refreshing={refreshing} onRefresh={onRefresh}>
         <Text style={styles.title}>Meu Perfil</Text>
 
         <View style={styles.avatarSection}>
@@ -148,7 +164,7 @@ export default function PlayerProfileScreen() {
           <Button label="Sair da conta" variant="outline" onPress={handleLogout} fullWidth />
           <Button label="Excluir minha conta" variant="danger" onPress={handleDeleteAccount} fullWidth />
         </View>
-      </ScrollView>
+      </RefreshableScrollView>
     </SafeAreaView>
   );
 }

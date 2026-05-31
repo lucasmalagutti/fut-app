@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Plus } from 'lucide-react-native';
-import { FlatList, Image, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { useCallback } from 'react';
+import { FlatList, Image, Pressable, RefreshControl, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { usePullToRefresh } from '../../../hooks/usePullToRefresh';
 import { Avatar } from '../../../components/ui/Avatar';
 import { Badge } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
@@ -22,6 +24,9 @@ export default function OwnerCourtsScreen() {
   });
 
   const courts = data ?? [];
+
+  const refetchCourts = useCallback(() => refetch(), [refetch]);
+  const { refreshing, onRefresh } = usePullToRefresh(refetchCourts);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -85,8 +90,9 @@ export default function OwnerCourtsScreen() {
             </Card>
           )}
           contentContainerStyle={styles.list}
-          onRefresh={refetch}
-          refreshing={isLoading}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary[600]} />
+          }
           showsVerticalScrollIndicator={false}
         />
       )}

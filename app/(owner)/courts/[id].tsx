@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Calendar, Camera, ChevronLeft, Clock, Pencil, Plus, Trash2 } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Image,
@@ -23,8 +23,11 @@ import { Card } from '../../../components/ui/Card';
 import { Chip } from '../../../components/ui/Chip';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { SelectPicker } from '../../../components/ui/SelectPicker';
+import { RefreshableScrollView } from '../../../components/ui/RefreshableScrollView';
+import { mergeRefetch, usePullToRefresh } from '../../../hooks/usePullToRefresh';
 import { CITIES_BY_STATE, STATES } from '../../../constants/brazil-locations';
 import { courtsService } from '../../../services/courts.service';
+import { resolveMediaUrl } from '../../../utils/media';
 import { colors, spacing } from '../../../theme';
 import { formatCurrency } from '../../../utils/format';
 
@@ -127,20 +130,26 @@ export default function OwnerCourtDetailScreen() {
     city: '', state: 'SP', zip: '', rules: '', mapsUrl: '', amenities: [],
   });
 
-  const { data: court, isLoading } = useQuery({
+  const { data: court, isLoading, refetch: refetchCourt } = useQuery({
     queryKey: ['court', id],
     queryFn: () => courtsService.get(id),
   });
 
-  const { data: schedules = [] } = useQuery({
+  const { data: schedules = [], refetch: refetchSchedules } = useQuery({
     queryKey: ['court-schedules', id],
     queryFn: () => courtsService.getSchedules(id),
   });
 
-  const { data: blocks = [] } = useQuery({
+  const { data: blocks = [], refetch: refetchBlocks } = useQuery({
     queryKey: ['court-blocks', id],
     queryFn: () => courtsService.getBlocks(id),
   });
+
+  const refetchAll = useCallback(
+    () => mergeRefetch(refetchCourt, refetchSchedules, refetchBlocks),
+    [refetchCourt, refetchSchedules, refetchBlocks],
+  );
+  const { refreshing, onRefresh } = usePullToRefresh(refetchAll);
 
   // Preenche o form de edição quando os dados da quadra carregam
   useEffect(() => {
@@ -378,7 +387,7 @@ export default function OwnerCourtDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <RefreshableScrollView showsVerticalScrollIndicator={false} refreshing={refreshing} onRefresh={onRefresh}>
 
         {/* Header */}
         <View style={styles.header}>
@@ -480,7 +489,7 @@ export default function OwnerCourtDetailScreen() {
                     {photos.map((photo: any) => (
                       <View key={photo.id} style={styles.photoThumb}>
                         <Image
-                          source={{ uri: photo.url }}
+                          source={{ uri: resolveMediaUrl(photo.url) }}
                           style={styles.photoImg}
                           resizeMode="cover"
                         />
@@ -589,7 +598,7 @@ export default function OwnerCourtDetailScreen() {
             fullWidth
           />
         </View>
-      </ScrollView>
+      </RefreshableScrollView>
 
       {/* ── Modal: Editar Quadra ── */}
       <Modal visible={editModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditModal(false)}>

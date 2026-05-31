@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Clock, Share2, Users } from 'lucide-react-native';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -19,7 +19,13 @@ import { Badge } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
+import { PaymentMethodPicker, type AutoPayMethod } from '../../../components/payments/PaymentMethodPicker';
+import { PixPaymentModal } from '../../../components/payments/PixPaymentModal';
+import { RefreshableScrollView } from '../../../components/ui/RefreshableScrollView';
+import { mergeRefetch, usePullToRefresh } from '../../../hooks/usePullToRefresh';
 import { matchesService } from '../../../services/matches.service';
+import { paymentsService } from '../../../services/payments.service';
+import { walletService } from '../../../services/wallet.service';
 import { useAuthStore } from '../../../store/auth.store';
 import { colors, spacing } from '../../../theme';
 import type { MatchParticipant } from '../../../types';
@@ -63,22 +69,56 @@ export default function MatchDetailScreen() {
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
-  const [guestModal, setGuestModal] = useState(false);
+  const [joinModal, setJoinModal] = useState(false);
+  const [joinWithGuest, setJoinWithGuest] = useState(false);
   const [guestName, setGuestName] = useState('');
+  const [payMethod, setPayMethod] = useState<AutoPayMethod>('wallet');
+  const [payCardId, setPayCardId] = useState<string | undefined>();
+  const [pixModal, setPixModal] = useState<{
+    paymentId: string;
+    amount: number;
+    qrCode?: string;
+    qrCodeUrl?: string;
+  } | null>(null);
+  const [paying, setPaying] = useState(false);
 
-  const { data: match, isLoading } = useQuery({
+  const { data: match, isLoading, refetch: refetchMatch } = useQuery({
     queryKey: ['match', id],
     queryFn: () => matchesService.get(id),
   });
 
+  const { data: wallet, refetch: refetchWallet } = useQuery({
+    queryKey: ['wallet'],
+    queryFn: () => walletService.get(),
+  });
+
+  const { data: cards = [], refetch: refetchCards } = useQuery({
+    queryKey: ['cards'],
+    queryFn: () => paymentsService.listCards(),
+  });
+
+  const refetchAll = useCallback(
+    () => mergeRefetch(refetchMatch, refetchWallet, refetchCards),
+    [refetchMatch, refetchWallet, refetchCards],
+  );
+  const { refreshing, onRefresh } = usePullToRefresh(refetchAll);
+
   // ── Mutations ──────────────────────────────────────────────────────────────
 
   const joinMutation = useMutation({
-    mutationFn: (gName?: string) => matchesService.join(id, gName ? { guestName: gName } : undefined),
+    mutationFn: (opts: { guestName?: string }) =>
+      matchesService.join(id, {
+        payment: {
+          preferredPayMethod: payMethod,
+          ...(payMethod === 'card' && payCardId ? { preferredCardId: payCardId } : {}),
+        },
+        ...(opts.guestName ? { guestName: opts.guestName } : {}),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['match', id] });
       queryClient.invalidateQueries({ queryKey: ['matches'] });
-      setGuestModal(false);
+      setJoinModal(false);
+      setJoinWithGuest(false);
       setGuestName('');
     },
     onError: (err: unknown) => {
@@ -125,7 +165,7 @@ export default function MatchDetailScreen() {
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
-  if (isLoading) return <LoadingSpinner fullScreen />;
+  if (isLoading && !match) return <LoadingSpinner fullScreen />;
   if (!match) return null;
 
   const booking = match.booking;
@@ -150,11 +190,29 @@ export default function MatchDetailScreen() {
     : null;
 
   function handleJoin() {
-    Alert.alert('Entrar na partida', 'Deseja entrar sozinho ou adicionar um convidado?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Sozinho', onPress: () => joinMutation.mutate(undefined) },
-      { text: 'Com convidado', onPress: () => setGuestModal(true) },
-    ]);
+    setJoinWithGuest(false);
+    setGuestName('');
+    const def = cards.find((c) => c.isDefault) ?? cards[0];
+    if (def) setPayCardId(def.id);
+    setJoinModal(true);
+  }
+
+  function confirmJoin() {
+    if (payMethod === 'card' && !payCardId) {
+      Alert.alert('Cartão', 'Selecione um cartão ou cadastre em Carteira → Cartões.');
+      return;
+    }
+    if (joinWithGuest && !guestName.trim()) {
+      Alert.alert('Convidado', 'Informe o nome do convidado.');
+      return;
+    }
+    joinMutation.mutate(joinWithGuest ? { guestName: guestName.trim() } : {});
+  }
+
+  function payMethodLabel(p: MatchParticipant) {
+    if (p.preferredPayMethod === 'wallet') return 'Cobrança: carteira';
+    if (p.preferredPayMethod === 'card') return 'Cobrança: cartão';
+    return null;
   }
 
   function handleLeave() {
@@ -177,6 +235,69 @@ export default function MatchDetailScreen() {
         },
       ],
     );
+  }
+
+  async function handlePayQuota() {
+    if (!myParticipant?.quota) {
+      Alert.alert('Aguarde', 'A cota será definida quando as inscrições fecharem.');
+      return;
+    }
+
+    const wallet = await walletService.get().catch(() => ({ balance: 0 }));
+    const cardList = await paymentsService.listCards().catch(() => [] as { id: string; last4: string; isDefault: boolean }[]);
+
+    const options: { text: string; onPress?: () => void; style?: 'cancel' | 'destructive' }[] = [
+      { text: 'Cancelar', style: 'cancel' },
+    ];
+
+    if ((wallet?.balance ?? 0) >= myParticipant.quota) {
+      options.unshift({
+        text: `Saldo da carteira (${formatCurrency(wallet!.balance)})`,
+        onPress: () => runPay('wallet'),
+      });
+    }
+
+    if (cardList.length > 0) {
+      const defaultCard = cardList.find((c: any) => c.isDefault) ?? cardList[0];
+      options.unshift({
+        text: `Cartão •••• ${defaultCard.last4}`,
+        onPress: () => runPay('card', defaultCard.id),
+      });
+    }
+
+    options.unshift({
+      text: 'PIX',
+      onPress: () => runPay('pix'),
+    });
+
+    Alert.alert(`Pagar cota ${formatCurrency(myParticipant.quota)}`, 'Escolha a forma de pagamento:', options);
+
+    async function runPay(method: 'pix' | 'card' | 'wallet', cardId?: string) {
+      setPaying(true);
+      try {
+        const res = await paymentsService.checkoutParticipant(myParticipant!.id, {
+          method,
+          cardId,
+        });
+        if (method === 'pix' && res.paymentId) {
+          setPixModal({
+            paymentId: res.paymentId,
+            amount: myParticipant!.quota!,
+            qrCode: res.qrCode,
+            qrCodeUrl: res.qrCodeUrl,
+          });
+        } else {
+          Alert.alert('Sucesso', 'Pagamento confirmado!');
+          queryClient.invalidateQueries({ queryKey: ['match', id] });
+          queryClient.invalidateQueries({ queryKey: ['wallet'] });
+        }
+      } catch (err: unknown) {
+        const msg = (err as any)?.response?.data?.message ?? 'Erro ao pagar.';
+        Alert.alert('Erro', msg);
+      } finally {
+        setPaying(false);
+      }
+    }
   }
 
   async function handleShare() {
@@ -203,7 +324,7 @@ export default function MatchDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <RefreshableScrollView contentContainerStyle={styles.scroll} refreshing={refreshing} onRefresh={onRefresh}>
 
         {/* Header */}
         <View style={styles.topBar}>
@@ -320,6 +441,9 @@ export default function MatchDetailScreen() {
                   {p.slots > 1 && (
                     <Text style={styles.participantSlots}>{p.slots} vagas</Text>
                   )}
+                  {payMethodLabel(p) && (
+                    <Text style={styles.participantPay}>{payMethodLabel(p)}</Text>
+                  )}
                 </View>
                 <Badge label={label} variant={variant} />
               </Card>
@@ -335,6 +459,25 @@ export default function MatchDetailScreen() {
               label="Entrar na partida"
               onPress={handleJoin}
               loading={joinMutation.isPending}
+              fullWidth
+              size="lg"
+            />
+          )}
+
+          {/* Pagar cota */}
+          {isParticipant &&
+            myParticipant &&
+            myParticipant.paymentStatus !== 'paid' &&
+            myParticipant.paymentStatus !== 'checked_in' &&
+            (myParticipant.quota ?? 0) > 0 && (
+            <Button
+              label={
+                myParticipant?.paymentStatus === 'unpaid'
+                  ? `Pagar PIX — ${formatCurrency(myParticipant.quota ?? 0)}`
+                  : `Pagar cota — ${formatCurrency(myParticipant.quota ?? 0)}`
+              }
+              onPress={handlePayQuota}
+              loading={paying}
               fullWidth
               size="lg"
             />
@@ -394,39 +537,94 @@ export default function MatchDetailScreen() {
             <Text style={styles.closedMsg}>Partida lotada — sem vagas disponíveis.</Text>
           )}
         </View>
-      </ScrollView>
+      </RefreshableScrollView>
 
-      {/* Modal: nome do convidado */}
-      <Modal visible={guestModal} transparent animationType="fade">
+      {pixModal && (
+        <PixPaymentModal
+          visible
+          paymentId={pixModal.paymentId}
+          amount={pixModal.amount}
+          qrCode={pixModal.qrCode}
+          qrCodeUrl={pixModal.qrCodeUrl}
+          title="Pagar cota da partida"
+          onPaid={() => {
+            setPixModal(null);
+            queryClient.invalidateQueries({ queryKey: ['match', id] });
+            queryClient.invalidateQueries({ queryKey: ['wallet'] });
+          }}
+          onClose={() => setPixModal(null)}
+        />
+      )}
+
+      {/* Modal: entrar na partida + forma de pagamento */}
+      <Modal visible={joinModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Nome do convidado</Text>
-            <Text style={styles.modalHint}>
-              Você pagará por 2 cotas (você + convidado).
-            </Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Ex: João Silva"
-              value={guestName}
-              onChangeText={setGuestName}
-              autoFocus
-            />
-            <View style={styles.modalButtons}>
-              <Button
-                label="Cancelar"
-                variant="outline"
-                onPress={() => { setGuestModal(false); setGuestName(''); }}
-                style={{ flex: 1 }}
+          <ScrollView contentContainerStyle={styles.modalScroll}>
+            <View style={styles.modalBox}>
+              <Text style={styles.modalTitle}>Entrar na partida</Text>
+
+              <View style={styles.joinTypeRow}>
+                <Pressable
+                  onPress={() => setJoinWithGuest(false)}
+                  style={[styles.joinTypeBtn, !joinWithGuest && styles.joinTypeBtnActive]}
+                >
+                  <Text style={styles.joinTypeText}>Sozinho</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setJoinWithGuest(true)}
+                  style={[styles.joinTypeBtn, joinWithGuest && styles.joinTypeBtnActive]}
+                >
+                  <Text style={styles.joinTypeText}>Com convidado</Text>
+                </Pressable>
+              </View>
+
+              {joinWithGuest && (
+                <>
+                  <Text style={styles.modalHint}>Você pagará por 2 cotas (você + convidado).</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Nome do convidado"
+                    value={guestName}
+                    onChangeText={setGuestName}
+                  />
+                </>
+              )}
+
+              <PaymentMethodPicker
+                method={payMethod}
+                onMethodChange={(m) => {
+                  setPayMethod(m);
+                  if (m === 'card') {
+                    const def = cards.find((c) => c.isDefault) ?? cards[0];
+                    if (def) setPayCardId(def.id);
+                  }
+                }}
+                cardId={payCardId}
+                onCardIdChange={setPayCardId}
+                cards={cards}
+                walletBalance={wallet?.balance ?? 0}
+                disabled={joinMutation.isPending}
               />
-              <Button
-                label="Confirmar"
-                onPress={() => joinMutation.mutate(guestName.trim() || undefined)}
-                loading={joinMutation.isPending}
-                disabled={!guestName.trim()}
-                style={{ flex: 1 }}
-              />
+
+              <View style={styles.modalButtons}>
+                <Button
+                  label="Cancelar"
+                  variant="outline"
+                  onPress={() => {
+                    setJoinModal(false);
+                    setGuestName('');
+                  }}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  label="Confirmar"
+                  onPress={confirmJoin}
+                  loading={joinMutation.isPending}
+                  style={{ flex: 1 }}
+                />
+              </View>
             </View>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </SafeAreaView>
@@ -474,13 +672,26 @@ const styles = StyleSheet.create({
   participantCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   participantName: { fontSize: 14, fontWeight: '600', color: colors.text.primary },
   participantSlots: { fontSize: 12, color: colors.text.secondary },
+  participantPay: { fontSize: 11, color: colors.primary[600], marginTop: 2 },
 
   actionsContainer: { marginTop: spacing.sm, gap: spacing.sm },
   emptyText: { fontSize: 14, color: colors.text.secondary, fontStyle: 'italic' },
   closedMsg: { fontSize: 14, color: colors.text.secondary, textAlign: 'center', fontStyle: 'italic' },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: spacing.lg },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' },
+  modalScroll: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg },
   modalBox: { backgroundColor: colors.white, borderRadius: 16, padding: spacing.lg, gap: spacing.md },
+  joinTypeRow: { flexDirection: 'row', gap: spacing.sm },
+  joinTypeBtn: {
+    flex: 1,
+    padding: spacing.sm,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  joinTypeBtnActive: { borderColor: colors.primary[600], backgroundColor: colors.primary[50] },
+  joinTypeText: { fontSize: 14, fontWeight: '600', color: colors.text.primary },
   modalTitle: { fontSize: 18, fontWeight: '700', color: colors.text.primary },
   modalHint: { fontSize: 13, color: colors.text.secondary },
   modalInput: {
