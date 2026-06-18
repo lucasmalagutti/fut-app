@@ -44,6 +44,15 @@ export function BookingCard({ booking, onPress }: BookingCardProps) {
             {formatTime(booking.startsAt)} – {formatTime(booking.endsAt)}
           </Text>
         </View>
+        {booking.match && (
+          <Text style={styles.matchInfo}>
+            Partida · {booking.match.sport}
+            {booking.match.host?.name ? ` · ${booking.match.host.name}` : ''}
+          </Text>
+        )}
+        {!booking.match && booking.player?.name && (
+          <Text style={styles.matchInfo}>Reserva · {booking.player.name}</Text>
+        )}
       </View>
 
       <Text style={styles.price}>{formatCurrency(booking.totalPrice)}</Text>
@@ -57,5 +66,6 @@ const styles = StyleSheet.create({
   info: { gap: spacing.xs, marginBottom: spacing.sm },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   infoText: { fontSize: 13, color: colors.text.secondary },
+  matchInfo: { fontSize: 12, fontWeight: '600', color: colors.primary[600], marginTop: 2 },
   price: { fontSize: 17, fontWeight: '700', color: colors.primary[600] },
 });

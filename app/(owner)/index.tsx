@@ -23,8 +23,8 @@ export default function OwnerDashboardScreen() {
   });
 
   const { data: bookingsData, isLoading, refetch: refetchBookings } = useQuery({
-    queryKey: ['bookings', 'confirmed'],
-    queryFn: () => bookingsService.list({ status: 'confirmed', limit: 10 }),
+    queryKey: ['bookings', 'owner', 'upcoming'],
+    queryFn: () => bookingsService.list({ upcoming: true }),
   });
 
   const refetchAll = useCallback(
@@ -62,10 +62,10 @@ export default function OwnerDashboardScreen() {
         {/* Upcoming bookings */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Próximas Reservas</Text>
+            <Text style={styles.sectionTitle}>Próximas Reservas e Partidas</Text>
             <Text
               style={styles.seeAll}
-              onPress={() => router.push('/(owner)/courts/index')}
+              onPress={() => router.push('/(owner)/bookings')}
             >
               Ver todas
             </Text>
@@ -75,7 +75,7 @@ export default function OwnerDashboardScreen() {
             <LoadingSpinner size="small" />
           ) : upcomingBookings.length === 0 ? (
             <Card style={styles.emptyCard}>
-              <Text style={styles.emptyText}>Nenhuma reserva confirmada.</Text>
+              <Text style={styles.emptyText}>Nenhuma reserva ou partida agendada nas suas quadras.</Text>
             </Card>
           ) : (
             <View style={styles.bookingsList}>
@@ -84,7 +84,7 @@ export default function OwnerDashboardScreen() {
                   key={booking.id}
                   booking={booking}
                   onPress={() =>
-                    router.push({ pathname: '/(player)/booking/[id]', params: { id: booking.id } })
+                    router.push({ pathname: '/(owner)/bookings/[id]', params: { id: booking.id } })
                   }
                 />
               ))}
