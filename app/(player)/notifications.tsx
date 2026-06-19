@@ -14,6 +14,7 @@ const typeLabel: Record<string, string> = {
   invite: 'Convite para partida',
   match_invite: 'Convite para partida',
   match_joined: 'Jogador entrou na partida',
+  match_join_confirmed: 'Você entrou na partida',
   match_cancelled_quorum: 'Partida cancelada',
   payment_charged: 'Pagamento realizado',
   pix_payment_required: 'PIX pendente',

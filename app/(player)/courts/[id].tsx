@@ -102,6 +102,11 @@ function dateToString(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function dateKeyFromISO(iso: string): string {
+  const d = new Date(iso);
+  return dateToString(d);
+}
+
 const WEEK_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const MONTH_LABELS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -135,11 +140,15 @@ export default function CourtDetailScreen() {
     queryFn: () => courtsService.getReviews(id),
   });
 
-  const { data: openMatches = [], refetch: refetchMatches } = useQuery({
+  const { data: openMatchesRaw = [], refetch: refetchMatches } = useQuery({
     queryKey: ['matches', 'open', id, selectedDate],
     queryFn: () => matchesService.findOpen({ courtId: id, date: selectedDate }),
     enabled: !!id && !!selectedDate,
   });
+
+  const openMatches = openMatchesRaw.filter(
+    (match) => match.booking?.startsAt && dateKeyFromISO(match.booking.startsAt) === selectedDate,
+  );
 
   const refetchAll = useCallback(
     () => mergeRefetch(refetchCourt, refetchAvail, refetchReviews, refetchMatches),

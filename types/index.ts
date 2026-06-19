@@ -94,6 +94,7 @@ export interface Booking {
   player?: User;
   payment?: Payment;
   review?: Review;
+  match?: Match;
 }
 
 export interface Match {

@@ -56,6 +56,8 @@ export default function OwnerLayout() {
       {/* Hide nested screens */}
       <Tabs.Screen name="courts/new" options={{ href: null }} />
       <Tabs.Screen name="courts/[id]" options={{ href: null }} />
+      <Tabs.Screen name="bookings/index" options={{ href: null }} />
+      <Tabs.Screen name="bookings/[id]" options={{ href: null }} />
       <Tabs.Screen name="chat/index" options={{ href: null }} />
       <Tabs.Screen name="chat/[threadId]" options={{ href: null }} />
     </Tabs>

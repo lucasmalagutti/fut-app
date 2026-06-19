@@ -40,11 +40,10 @@ interface UnifiedItem {
 
 // ── Filtros ───────────────────────────────────────────────────────────────────
 
-type FilterKey = 'all' | 'bookings' | 'matches' | 'awaiting' | 'confirmed';
+type FilterKey = 'all' | 'matches' | 'awaiting' | 'confirmed';
 
 const FILTERS: { label: string; value: FilterKey }[] = [
   { label: 'Todas',               value: 'all'      },
-  { label: 'Reservas',            value: 'bookings' },
   { label: 'Partidas',            value: 'matches'  },
   { label: 'Aguard. pagamento',   value: 'awaiting' },
   { label: 'Confirmadas',         value: 'confirmed'},
@@ -78,7 +77,6 @@ function isConfirmedItem(item: UnifiedItem): boolean {
 
 function applyFilter(items: UnifiedItem[], filter: FilterKey): UnifiedItem[] {
   switch (filter) {
-    case 'bookings':  return items.filter((i) => i.type === 'booking');
     case 'matches':   return items.filter((i) => i.type === 'match');
     case 'awaiting':  return items.filter(isAwaitingPayment);
     case 'confirmed': return items.filter(isConfirmedItem);
@@ -178,10 +176,11 @@ export default function BookingsScreen() {
   const { refreshing, onRefresh } = usePullToRefresh(refetchAll);
 
   const bookings: Booking[] = bookingsData?.data ?? [];
+  const matchBookingIds = new Set(myMatches.map((m) => m.bookingId));
+  const orphanBookings = bookings.filter((b) => !matchBookingIds.has(b.id));
 
-  // Lista bruta unificada (sem filtro de tipo ainda)
   const allItems: UnifiedItem[] = [
-    ...bookings.map((b): UnifiedItem => ({
+    ...orphanBookings.map((b): UnifiedItem => ({
       type: 'booking',
       id: b.id,
       sortDate: b.startsAt ?? b.createdAt,

@@ -17,6 +17,7 @@ interface BookingFilters {
   q?: string;
   page?: number;
   limit?: number;
+  upcoming?: boolean;
 }
 
 export const bookingsService = {
@@ -24,7 +25,20 @@ export const bookingsService = {
     api.post<Booking>('/bookings', data).then((r) => r.data),
 
   list: (filters?: BookingFilters) =>
-    api.get<PaginatedResponse<Booking>>('/bookings', { params: filters }).then((r) => r.data),
+    api.get<Booking[] | PaginatedResponse<Booking>>('/bookings', {
+      params: filters
+        ? {
+            ...filters,
+            ...(filters.upcoming !== undefined && { upcoming: String(filters.upcoming) }),
+          }
+        : undefined,
+    }).then((r) => {
+      const payload = r.data;
+      if (Array.isArray(payload)) {
+        return { data: payload, total: payload.length, page: 1, limit: payload.length };
+      }
+      return payload;
+    }),
 
   get: (id: string) => api.get<Booking>(`/bookings/${id}`).then((r) => r.data),
 
