@@ -25,6 +25,7 @@ import { formatCurrency, formatDate, formatTime } from '../../../utils/format';
 type TabKey = 'open' | 'mine';
 
 function matchStatusLabel(match: Match): { label: string; variant: 'success' | 'warning' | 'error' | 'neutral' } {
+  if (match.booking?.status === 'cancelled') return { label: 'Cancelada', variant: 'error' };
   if (match.confirmedAt) return { label: 'Confirmada', variant: 'success' };
   if (match.closedAt) return { label: 'Fechada', variant: 'warning' };
   return { label: 'Aberta', variant: 'neutral' };

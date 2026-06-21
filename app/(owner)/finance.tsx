@@ -3,7 +3,9 @@ import { ArrowDownLeft, ArrowUpRight, Plus, Trash2 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -12,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RefreshableScrollView } from '../../components/ui/RefreshableScrollView';
 import { mergeRefetch, usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { Button } from '../../components/ui/Button';
@@ -83,6 +86,7 @@ const txLabel: Record<string, string> = {
 
 export default function OwnerFinanceScreen() {
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const [showBankModal, setShowBankModal] = useState(false);
   const [showPayoutModal, setShowPayoutModal] = useState(false);
   const [payoutAmount, setPayoutAmount] = useState('');
@@ -322,6 +326,10 @@ export default function OwnerFinanceScreen() {
             </TouchableOpacity>
           </View>
 
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+          >
           <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
 
             {/* Nome do titular */}
@@ -426,13 +434,27 @@ export default function OwnerFinanceScreen() {
               size="lg"
             />
           </ScrollView>
+          </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
 
       {/* ── Modal: Solicitar saque ── */}
-      <Modal visible={showPayoutModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalBottom, { padding: spacing.xl, gap: spacing.lg }]}>
+      <Modal
+        visible={showPayoutModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { setShowPayoutModal(false); setPayoutAmount(''); }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <ScrollView
+            contentContainerStyle={styles.payoutScroll}
+            keyboardShouldPersistTaps="handled"
+            bounces={false}
+          >
+          <View style={[styles.modalBottom, { padding: spacing.xl, paddingBottom: insets.bottom + spacing.xl, gap: spacing.lg }]}>
             <Text style={styles.modalTitle}>Solicitar saque</Text>
             <Text style={styles.balanceInfo}>Saldo disponível: {formatCurrency(wallet?.balance ?? 0)}</Text>
             {defaultAccount && (
@@ -465,7 +487,8 @@ export default function OwnerFinanceScreen() {
               />
             </View>
           </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -517,6 +540,7 @@ const styles = StyleSheet.create({
 
   // Modal overlay (saque)
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  payoutScroll: { flexGrow: 1, justifyContent: 'flex-end' },
   modalBottom: { backgroundColor: colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
 
   // Campos

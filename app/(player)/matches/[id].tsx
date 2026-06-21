@@ -179,7 +179,8 @@ export default function MatchDetailScreen() {
   const isParticipant = !!myParticipant;
   const isClosed = !!match.closedAt;
   const isConfirmed = !!match.confirmedAt;
-  const canCancel = isHost && !isConfirmed;
+  const isCancelled = booking?.status === 'cancelled';
+  const canCancel = isHost && !isConfirmed && !isCancelled;
 
   const totalSlots = match.totalSlots ?? activeParticipants.reduce((s, p) => s + (p.slots ?? 1), 0);
   const estimatedQuota = match.estimatedQuota ?? 0;
@@ -530,10 +531,13 @@ export default function MatchDetailScreen() {
           )}
 
           {/* Mensagens de bloqueio */}
-          {!isParticipant && isClosed && (
+          {isCancelled && (
+            <Text style={styles.closedMsg}>Esta partida foi cancelada.</Text>
+          )}
+          {!isCancelled && !isParticipant && isClosed && (
             <Text style={styles.closedMsg}>Inscrições encerradas para esta partida.</Text>
           )}
-          {!isParticipant && !isClosed && spotsLeft <= 0 && (
+          {!isCancelled && !isParticipant && !isClosed && spotsLeft <= 0 && (
             <Text style={styles.closedMsg}>Partida lotada — sem vagas disponíveis.</Text>
           )}
         </View>

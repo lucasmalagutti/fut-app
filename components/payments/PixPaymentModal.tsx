@@ -36,6 +36,7 @@ export function PixPaymentModal({
   onClose,
 }: Props) {
   const [polling, setPolling] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     if (!visible || !paymentId) return;
@@ -63,6 +64,25 @@ export function PixPaymentModal({
     if (qrCode) Share.share({ message: qrCode });
   };
 
+  const qrImageUrl =
+    qrCodeUrl ??
+    (qrCode
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrCode)}`
+      : undefined);
+
+  async function simulatePayment() {
+    setConfirming(true);
+    try {
+      await paymentsService.confirmPayment(paymentId);
+      Alert.alert('Sucesso', 'Pagamento simulado com sucesso!');
+      onPaid();
+    } catch {
+      Alert.alert('Erro', 'Não foi possível confirmar o pagamento.');
+    } finally {
+      setConfirming(false);
+    }
+  }
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -70,10 +90,10 @@ export function PixPaymentModal({
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.amount}>{formatCurrency(amount)}</Text>
 
-          {qrCodeUrl ? (
-            <Image source={{ uri: qrCodeUrl }} style={styles.qr} resizeMode="contain" />
+          {qrImageUrl ? (
+            <Image source={{ uri: qrImageUrl }} style={styles.qr} resizeMode="contain" />
           ) : (
-            <Text style={styles.hint}>Escaneie o QR ou use o código copia-e-cola abaixo.</Text>
+            <Text style={styles.hint}>QR Code indisponível. Use o código copia-e-cola abaixo.</Text>
           )}
 
           {qrCode ? (
@@ -89,7 +109,13 @@ export function PixPaymentModal({
             {polling ? 'Aguardando confirmação do pagamento...' : ''}
           </Text>
 
-          <Button label="Fechar" variant="outline" onPress={onClose} />
+          <Button
+            label="Simular PIX pago (teste)"
+            variant="outline"
+            onPress={simulatePayment}
+            loading={confirming}
+          />
+          <Button label="Fechar" variant="ghost" onPress={onClose} />
         </View>
       </View>
     </Modal>

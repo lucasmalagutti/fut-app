@@ -28,6 +28,7 @@ export interface Court {
   ownerId: string;
   name: string;
   sport: string;
+  sports?: string[];
   description?: string;
   addressLine: string;
   city: string;

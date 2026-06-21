@@ -87,9 +87,15 @@ function applyFilter(items: UnifiedItem[], filter: FilterKey): UnifiedItem[] {
 // ── MatchCard ─────────────────────────────────────────────────────────────────
 
 function matchBadge(match: Match) {
+  if (match.booking?.status === 'cancelled') return { label: 'Cancelada', variant: 'error' as const };
   if (match.confirmedAt) return { label: 'Confirmada', variant: 'success' as const };
-  if (match.closedAt)    return { label: 'Cancelada',  variant: 'error'   as const };
-  return                        { label: 'Aberta',     variant: 'neutral' as const };
+  if (match.closedAt) return { label: 'Fechada', variant: 'warning' as const };
+  return { label: 'Aberta', variant: 'neutral' as const };
+}
+
+function isCancelledItem(item: UnifiedItem): boolean {
+  if (item.type === 'booking') return item.booking?.status === 'cancelled';
+  return item.match?.booking?.status === 'cancelled';
 }
 
 function MatchCard({ match, onPress }: { match: Match; onPress: () => void }) {
@@ -177,7 +183,9 @@ export default function BookingsScreen() {
 
   const bookings: Booking[] = bookingsData?.data ?? [];
   const matchBookingIds = new Set(myMatches.map((m) => m.bookingId));
-  const orphanBookings = bookings.filter((b) => !matchBookingIds.has(b.id));
+  const orphanBookings = bookings.filter(
+    (b) => !matchBookingIds.has(b.id) && b.status !== 'cancelled',
+  );
 
   const allItems: UnifiedItem[] = [
     ...orphanBookings.map((b): UnifiedItem => ({
@@ -186,7 +194,9 @@ export default function BookingsScreen() {
       sortDate: b.startsAt ?? b.createdAt,
       booking: b,
     })),
-    ...myMatches.map((m): UnifiedItem => ({
+    ...myMatches
+      .filter((m) => m.booking?.status !== 'cancelled')
+      .map((m): UnifiedItem => ({
       type: 'match',
       id: m.id,
       sortDate: m.booking?.startsAt ?? m.createdAt,
@@ -194,7 +204,8 @@ export default function BookingsScreen() {
     })),
   ].sort((a, b) => (a.sortDate < b.sortDate ? 1 : -1));
 
-  const filteredItems = applyFilter(allItems, filter);
+  const activeItems = allItems.filter((item) => !isCancelledItem(item));
+  const filteredItems = applyFilter(activeItems, filter);
 
   return (
     <SafeAreaView style={styles.safe}>

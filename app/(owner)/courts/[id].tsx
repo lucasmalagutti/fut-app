@@ -30,6 +30,7 @@ import { courtsService } from '../../../services/courts.service';
 import { resolveMediaUrl } from '../../../utils/media';
 import { colors, spacing } from '../../../theme';
 import { formatCurrency } from '../../../utils/format';
+import { getCourtSports } from '../../../utils/court';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -157,14 +158,7 @@ export default function OwnerCourtDetailScreen() {
     const amenities = Array.isArray(court.amenities)
       ? court.amenities
       : (() => { try { return JSON.parse(court.amenities as unknown as string); } catch { return []; } })();
-    // Deserializa sports: pode ser JSON array ou string simples (retrocompat)
-    let sports: string[] = [];
-    try {
-      const parsed = JSON.parse((court as any).sport ?? '');
-      sports = Array.isArray(parsed) ? parsed : [(court as any).sport];
-    } catch {
-      sports = court.sport ? [court.sport] : [];
-    }
+    const sports = getCourtSports(court);
 
     setEditForm({
       name: court.name ?? '',
@@ -415,12 +409,7 @@ export default function OwnerCourtDetailScreen() {
 
             <Text style={styles.infoLabel}>Esportes</Text>
             <View style={styles.chipsRow}>
-              {(() => {
-                let sports: string[] = [];
-                try { const p = JSON.parse((court as any).sport ?? ''); sports = Array.isArray(p) ? p : [court.sport]; }
-                catch { sports = court.sport ? [court.sport] : []; }
-                return sports.map((s, i) => <Chip key={i} label={s} />);
-              })()}
+              {getCourtSports(court).map((s, i) => <Chip key={i} label={s} />)}
             </View>
 
             <Text style={styles.infoLabel}>Endereço</Text>
