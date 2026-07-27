@@ -100,6 +100,3 @@ O checkout suporta cartão de crédito e PIX através do Stripe, integrado pelo 
 - Chamadas à API ficam isoladas na camada `services`, nunca diretamente nos componentes de tela
 - Estilos são definidos com `StyleSheet.create` ao final de cada arquivo de componente
 - Formulários usam `react-hook-form` com schemas Zod para validação
-## Licença
- 
-Uso privado e restrito à equipe do FutMatch.
